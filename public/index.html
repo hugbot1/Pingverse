@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Chat App</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+      #chat { list-style: none; padding: 0; margin: 0; height: 300px; overflow-y: scroll; border: 1px solid #ccc; }
+      #chat li { padding: 5px 10px; }
+      #form { display: flex; padding: 10px; }
+      #input { flex: 1; padding: 10px; border: 1px solid #ccc; }
+      #send { padding: 10px; }
+    </style>
+  </head>
+  <body>
+    <ul id="chat"></ul>
+    <form id="form" action="">
+      <input id="input" autocomplete="off" /><button id="send">Send</button>
+    </form>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      var socket = io();
+      var form = document.getElementById("form");
+      var input = document.getElementById("input");
+      var chat = document.getElementById("chat");
+
+      form.addEventListener("submit", function(e) {
+        e.preventDefault();
+        if (input.value) {
+          socket.emit("chat message", input.value);
+          input.value = "";
+        }
+      });
+
+      socket.on("chat message", function(msg) {
+        var item = document.createElement("li");
+        item.textContent = msg;
+        chat.appendChild(item);
+        chat.scrollTop = chat.scrollHeight;
+      });
+    </script>
+  </body>
+</html>
