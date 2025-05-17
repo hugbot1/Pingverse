@@ -27,7 +27,7 @@
     </style>
   </head>
   <body>
-    <ul id="chat"><h4 style="{ color: white; }">Chat:</h4></ul>
+    <ul id="chat"><h4 style="color: white;">Chat:</h4></ul>
     <form id="form" action="">
       <input id="input" autocomplete="off" /><button id="send">Send</button>
     </form>
@@ -48,8 +48,7 @@
       socket.on("chat message", function(msg) {
         var item = document.createElement("li");
         let randomNumber = Math.floor(Math.random() * (999 - 100 + 1)) + 1;
-        item.innerHTML = "User${randomNumber}:";
-        item.textContent = msg;
+        item.textContent = User${randomNumber}:${msg};
         chat.appendChild(item);
         chat.scrollTop = chat.scrollHeight;      });
 
