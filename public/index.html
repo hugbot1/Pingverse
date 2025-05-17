@@ -1,27 +1,85 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>Chat App</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    #chat { max-height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; }
-    #message { width: 80%; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f4f4f4;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      background: #333;
+      color: #fff;
+      padding: 1rem;
+      text-align: center;
+    }
+    #username {
+      font-size: 0.9em;
+      opacity: 0.8;
+    }
+    #chat {
+      flex: 1;
+      padding: 1rem;
+      overflow-y: auto;
+      background: #fff;
+      border-top: 1px solid #ccc;
+      border-bottom: 1px solid #ccc;
+    }
+    .message {
+      margin: 0.5rem 0;
+      padding: 0.5rem 1rem;
+      background: #e1f5fe;
+      border-radius: 1rem;
+      max-width: 80%;
+    }
+    footer {
+      display: flex;
+      padding: 1rem;
+      background: #eee;
+    }
+    #message {
+      flex: 1;
+      padding: 0.5rem;
+      font-size: 1rem;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      margin-left: 0.5rem;
+    }
   </style>
 </head>
 <body>
-  <h1>Chat App</h1>
+  <header>
+    <h1>Chat App</h1>
+    <div id="username">Connecting...</div>
+  </header>
   <div id="chat"></div>
-  <input id="message" autocomplete="off" placeholder="Type your message..." />
-  <button onclick="sendMessage()">Send</button>
+  <footer>
+    <input id="message" autocomplete="off" placeholder="Type your message..." />
+    <button onclick="sendMessage()">Send</button>
+  </footer>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
     const chat = document.getElementById('chat');
     const messageInput = document.getElementById('message');
+    const usernameDisplay = document.getElementById('username');
+
+    socket.on('welcome', username => {
+      usernameDisplay.textContent = "You are " + username;
+    });
 
     socket.on('chat message', msg => {
       const item = document.createElement('div');
+      item.className = 'message';
       item.textContent = msg;
       chat.appendChild(item);
       chat.scrollTop = chat.scrollHeight;
