@@ -11,7 +11,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc:  ["'self'"],
+        scriptSrc:  ["'self'", "'unsafe-inline'"],
         styleSrc:   ["'self'", "'unsafe-inline'"],
         // 'self' covers same-origin ws:// and wss:// — the bare ws:/wss: entries
         // don't include the host, so the browser blocked the socket upgrade.
