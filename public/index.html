@@ -3,177 +3,489 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
-  <title>Chat</title>
+  <title>TechChat</title>
   <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #111;
+      --surface: #1c1c1e;
+      --border:  #2c2c2e;
+      --text:    #f2f2f7;
+      --muted:   #8e8e93;
+      --accent:  #0a84ff;
+      --danger:  #ff453a;
+      --own-bg:  rgba(10,132,255,0.15);
+      --own-border: rgba(10,132,255,0.4);
+    }
+
     body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      background: #f4f4f4;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100dvh;
       display: flex;
       flex-direction: column;
-      height: 100vh;
     }
-    header {
-      background: #333;
-      color: #fff;
-      padding: 1rem;
-      text-align: center;
-    }
-    #username {
-      font-size: 0.9em;
-      opacity: 0.8;
-    }
-    #chat {
+
+    /* ── Auth screen ────────────────────────────────────── */
+    #auth-screen {
       flex: 1;
-      padding: 1rem;
-      overflow-y: auto;
-      background-color: #222;
-    }
-    .message {
-      margin: 0.5rem 0;
-      padding: 0.5rem 1rem;
-      background: #e1f5fe;
-      border-radius: 1rem;
-      max-width: 80%;
-    }
-    .message.own {
-      background: #2979ff22;
-      border: 1px solid #2979ff55;
-      margin-left: auto;
-    }
-    .message .meta {
-      font-size: 0.75em;
-      color: #666;
-      margin-bottom: 2px;
-    }
-    .message .text {
-      word-break: break-word;
-    }
-    #error-banner {
-      display: none;
-      background: #b71c1c;
-      color: #fff;
-      padding: 0.4rem 1rem;
-      font-size: 0.85em;
-      text-align: center;
-    }
-    #char-count {
-      font-size: 0.75em;
-      color: #888;
-      align-self: center;
-      white-space: nowrap;
-    }
-    #char-count.warn { color: #e65100; }
-    #char-count.over { color: #b71c1c; font-weight: bold; }
-    footer {
-      display: flex;
-      padding: 1rem;
-      gap: 10px;
-      background-color: #222;
-      align-items: center;
-    }
-    #message {
-      font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","Roboto","Oxygen","Ubuntu","Cantarell","Fira Sans","Droid Sans","Helvetica Neue",sans-serif;
-      color: #fff;
-      background-color: rgb(28,28,30);
-      box-shadow: 0 0 .4vw rgba(0,0,0,0.5), 0 0 0 .15vw transparent;
-      border-radius: 0.4vw;
-      border: none;
-      outline: none;
-      padding: 0.4vw;
-      width: 100%;
-      transition: .4s;
-      border-radius: 10px;
-    }
-    #message:hover { box-shadow: 0 0 0 .15vw rgba(135,207,235,0.186); }
-    #message:focus { box-shadow: 0 0 0 .15vw skyblue; }
-    button {
-      font-family: inherit;
-      font-size: 18px;
-      background: linear-gradient(to bottom, #4dc7d9 0%,#66a6ff 100%);
-      color: white;
-      padding: 0.8em 1.2em;
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 1rem;
+    }
+
+    .auth-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .auth-card h1 {
+      font-size: 1.5rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .auth-card .subtitle {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 4px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 0.5rem;
       border: none;
-      border-radius: 25px;
-      box-shadow: 0px 5px 10px rgba(0,0,0,0.2);
-      transition: all 0.3s;
-    }
-    button:hover {
-      transform: translateY(-3px);
-      box-shadow: 0px 8px 15px rgba(0,0,0,0.3);
-      padding: 0em;
-      background: linear-gradient(to bottom, #5bd9ec 0%,#97c3ff 100%);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.9rem;
       cursor: pointer;
+      transition: all 0.2s;
     }
-    button:active { transform: scale(0.95); box-shadow: 0px 2px 5px rgba(0,0,0,0.2); }
-    button span { display: block; margin-left: 0.4em; transition: all 0.3s; }
-    button:hover span { scale: 0; font-size: 0%; opacity: 0; transition: all 0.5s; }
-    button svg { width: 18px; height: 18px; fill: white; transition: all 0.3s; }
-    button .svg-wrapper {
+
+    .tab-btn.active {
+      background: var(--surface);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .field {
+      margin-bottom: 1rem;
+    }
+
+    .field label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .field input[type="text"],
+    .field input[type="password"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1rem;
+      padding: 0.6rem 0.8rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .field input:focus { border-color: var(--accent); }
+
+    .key-drop {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.85rem;
+      color: var(--muted);
+      position: relative;
+    }
+    .key-drop:hover, .key-drop.drag-over { border-color: var(--accent); color: var(--accent); }
+    .key-drop.loaded { border-color: #30d158; color: #30d158; }
+    .key-drop input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+
+    .auth-error {
+      background: rgba(255,69,58,0.15);
+      border: 1px solid rgba(255,69,58,0.4);
+      border-radius: 8px;
+      color: var(--danger);
+      font-size: 0.85rem;
+      padding: 0.6rem 0.8rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .submit-btn:not(:disabled):hover { opacity: 0.85; }
+
+    /* ── Chat screen ────────────────────────────────────── */
+    #chat-screen { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    header h1 { font-size: 1rem; font-weight: 700; }
+    #header-user { font-size: 0.85rem; color: var(--muted); }
+
+    #signout-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      padding: 0.3rem 0.6rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    #signout-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+    #error-banner {
+      display: none;
+      background: rgba(255,69,58,0.15);
+      border-bottom: 1px solid rgba(255,69,58,0.3);
+      color: var(--danger);
+      padding: 0.4rem 1rem;
+      font-size: 0.85rem;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .message {
+      max-width: 75%;
+      padding: 0.5rem 0.8rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      align-self: flex-start;
+    }
+
+    .message.own {
+      align-self: flex-end;
+      background: var(--own-bg);
+      border-color: var(--own-border);
+    }
+
+    .message .meta {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+
+    .message .text { word-break: break-word; font-size: 0.95rem; }
+
+    #composer {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    #msg-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text);
+      font-size: 0.95rem;
+      padding: 0.55rem 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    #msg-input:focus { border-color: var(--accent); }
+
+    #char-count { font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
+    #char-count.warn { color: #ff9f0a; }
+    #char-count.over { color: var(--danger); font-weight: bold; }
+
+    #send-btn {
+      background: var(--accent);
+      border: none;
+      border-radius: 50%;
+      width: 38px; height: 38px;
       display: flex; align-items: center; justify-content: center;
-      width: 30px; height: 30px; border-radius: 50%;
-      background-color: rgba(255,255,255,0.2); transition: all 0.3s;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: opacity 0.2s;
     }
-    button:hover .svg-wrapper { background-color: rgba(43,169,228,0.897); width: 54px; height: 54px; }
-    button:hover svg { width: 25px; height: 25px; margin-right: 5px; transform: rotate(45deg); }
+    #send-btn:hover { opacity: 0.8; }
+    #send-btn svg { fill: #fff; width: 18px; height: 18px; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Chat</h1>
-    <div id="username">Connecting...</div>
-  </header>
-  <div id="error-banner"></div>
-  <div id="chat"></div>
-  <footer>
-    <input id="message" autocomplete="off" placeholder="Type your message..." maxlength="500" />
-    <span id="char-count">0/500</span>
-    <button onclick="sendMessage()">
-      <div class="svg-wrapper-1">
-        <div class="svg-wrapper">
-          <svg height="24" width="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M0 0h24v24H0z" fill="none"></path>
-            <path d="M1.946 9.315c-.522-.174-.527-.455.01-.634l19.087-6.362c.529-.176.832.12.684.638l-5.454 19.086c-.15.529-.455.547-.679.045L12 14l6-8-8 6-8.054-2.685z" fill="currentColor"></path>
-          </svg>
+
+  <!-- ── Auth screen ─────────────────────────────────────── -->
+  <div id="auth-screen">
+    <div class="auth-card">
+      <h1>TechChat</h1>
+      <p class="subtitle">Sign in or create an account to continue.</p>
+
+      <div class="tabs">
+        <button class="tab-btn active" onclick="showTab('login')">Sign In</button>
+        <button class="tab-btn"        onclick="showTab('register')">Register</button>
+      </div>
+
+      <div id="auth-error" class="auth-error"></div>
+
+      <div class="field">
+        <label>Username</label>
+        <input id="auth-username" type="text" autocomplete="username"
+               placeholder="your_handle" maxlength="20" />
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <input id="auth-password" type="password" autocomplete="current-password"
+               placeholder="••••••••" />
+      </div>
+
+      <div class="field">
+        <label>Key File <span style="color:var(--muted)">(provided by admin)</span></label>
+        <div class="key-drop" id="key-drop">
+          <input type="file" id="key-file-input" accept="*" />
+          <span id="key-drop-label">📎 Drop your .key file here or click to browse</span>
         </div>
       </div>
-      <span>Send</span>
-    </button>
-  </footer>
+
+      <button class="submit-btn" id="auth-submit" onclick="submitAuth()">Sign In</button>
+    </div>
+  </div>
+
+  <!-- ── Chat screen ─────────────────────────────────────── -->
+  <div id="chat-screen">
+    <header>
+      <h1>TechChat</h1>
+      <span id="header-user"></span>
+      <button id="signout-btn" onclick="signOut()">Sign out</button>
+    </header>
+    <div id="error-banner"></div>
+    <div id="messages"></div>
+    <div id="composer">
+      <input id="msg-input" autocomplete="off" placeholder="Message…" maxlength="500" />
+      <span id="char-count">0/500</span>
+      <button id="send-btn" onclick="sendMessage()">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1.946 9.315c-.522-.174-.527-.455.01-.634l19.087-6.362c.529-.176.832.12.684.638l-5.454 19.086c-.15.529-.455.547-.679.045L12 14l6-8-8 6-8.054-2.685z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
+    // ── State ───────────────────────────────────────────────
     const MAX_LENGTH = 500;
-    const socket = io();
-    const chat    = document.getElementById('chat');
-    const input   = document.getElementById('message');
-    const userDisplay  = document.getElementById('username');
+    let socket      = null;
+    let myUsername  = null;
+    let authToken   = sessionStorage.getItem('tc_token');
+    let authMode    = 'login'; // 'login' | 'register'
+    let keyFileData = null;    // base64 string of uploaded key file
+
+    // ── Elements ────────────────────────────────────────────
+    const authScreen   = document.getElementById('auth-screen');
+    const chatScreen   = document.getElementById('chat-screen');
+    const authError    = document.getElementById('auth-error');
+    const authSubmit   = document.getElementById('auth-submit');
+    const keyDrop      = document.getElementById('key-drop');
+    const keyInput     = document.getElementById('key-file-input');
+    const keyLabel     = document.getElementById('key-drop-label');
+    const messagesEl   = document.getElementById('messages');
+    const msgInput     = document.getElementById('msg-input');
     const charCount    = document.getElementById('char-count');
     const errorBanner  = document.getElementById('error-banner');
+    const headerUser   = document.getElementById('header-user');
+    let errorTimer     = null;
 
-    let myUsername = null;
-    let errorTimer = null;
-
-    // ── Character counter ──────────────────────────────────────────────────────
-    input.addEventListener('input', () => {
-      const len = input.value.length;
-      charCount.textContent = `${len}/${MAX_LENGTH}`;
-      charCount.className = len > MAX_LENGTH * 0.9 ? (len >= MAX_LENGTH ? 'over' : 'warn') : '';
-    });
-
-    // ── Show a dismissing error banner ─────────────────────────────────────────
-    function showError(msg) {
-      errorBanner.textContent = msg;
-      errorBanner.style.display = 'block';
-      clearTimeout(errorTimer);
-      errorTimer = setTimeout(() => { errorBanner.style.display = 'none'; }, 4000);
+    // ── Tab switching ───────────────────────────────────────
+    function showTab(mode) {
+      authMode = mode;
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', (i === 0) === (mode === 'login'));
+      });
+      authSubmit.textContent = mode === 'login' ? 'Sign In' : 'Create Account';
+      authError.style.display = 'none';
+      document.getElementById('auth-password').autocomplete =
+        mode === 'login' ? 'current-password' : 'new-password';
     }
 
-    // ── Render a single message entry safely (no innerHTML) ────────────────────
+    // ── Key file handling ────────────────────────────────────
+    function loadKeyFile(file) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        // Store as base64 — strip the data-URL prefix if present
+        const result = e.target.result;
+        keyFileData = typeof result === 'string'
+          ? result.split(',').pop()
+          : btoa(String.fromCharCode(...new Uint8Array(result)));
+        keyDrop.classList.add('loaded');
+        keyLabel.textContent = '✓ ' + file.name + ' loaded';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    keyInput.addEventListener('change', () => {
+      if (keyInput.files[0]) loadKeyFile(keyInput.files[0]);
+    });
+
+    keyDrop.addEventListener('dragover', e => { e.preventDefault(); keyDrop.classList.add('drag-over'); });
+    keyDrop.addEventListener('dragleave', () => keyDrop.classList.remove('drag-over'));
+    keyDrop.addEventListener('drop', e => {
+      e.preventDefault();
+      keyDrop.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) loadKeyFile(e.dataTransfer.files[0]);
+    });
+
+    // ── Auth submit ─────────────────────────────────────────
+    async function submitAuth() {
+      const username = document.getElementById('auth-username').value.trim();
+      const password = document.getElementById('auth-password').value;
+
+      if (!keyFileData) { showAuthError('Please upload your key file.'); return; }
+      if (!username)    { showAuthError('Enter a username.'); return; }
+      if (!password)    { showAuthError('Enter a password.'); return; }
+
+      authSubmit.disabled = true;
+      authSubmit.textContent = authMode === 'login' ? 'Signing in…' : 'Creating account…';
+
+      try {
+        const res  = await fetch('/auth/' + authMode, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ username, password, keyFile: keyFileData }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showAuthError(data.error || 'Something went wrong.');
+          return;
+        }
+
+        authToken = data.token;
+        myUsername = data.username;
+        sessionStorage.setItem('tc_token', authToken);
+        enterChat();
+
+      } catch {
+        showAuthError('Could not reach the server. Try again.');
+      } finally {
+        authSubmit.disabled = false;
+        authSubmit.textContent = authMode === 'login' ? 'Sign In' : 'Create Account';
+      }
+    }
+
+    function showAuthError(msg) {
+      authError.textContent = msg;
+      authError.style.display = 'block';
+    }
+
+    // ── Enter chat ──────────────────────────────────────────
+    function enterChat() {
+      authScreen.style.display  = 'none';
+      chatScreen.style.display  = 'flex';
+      headerUser.textContent    = myUsername;
+
+      socket = io({ auth: { token: authToken } });
+
+      socket.on('welcome', ({ username, history }) => {
+        myUsername = username;
+        headerUser.textContent = username;
+        history.forEach(renderMessage);
+      });
+
+      socket.on('chat message', renderMessage);
+
+      socket.on('error', msg => showChatError(msg));
+
+      socket.on('kicked', msg => {
+        showChatError('Signed out: ' + msg);
+        setTimeout(signOut, 2000);
+      });
+
+      socket.on('connect_error', err => {
+        if (err.message === 'Unauthorised') {
+          sessionStorage.removeItem('tc_token');
+          location.reload();
+        } else {
+          headerUser.textContent = '⚠ Reconnecting…';
+        }
+      });
+
+      socket.on('disconnect', () => {
+        headerUser.textContent = '⚠ Disconnected — reconnecting…';
+      });
+
+      socket.on('reconnect', () => {
+        headerUser.textContent = myUsername;
+      });
+    }
+
+    // ── Sign out ────────────────────────────────────────────
+    function signOut() {
+      sessionStorage.removeItem('tc_token');
+      if (socket) { socket.disconnect(); socket = null; }
+      chatScreen.style.display = 'none';
+      authScreen.style.display = 'flex';
+      messagesEl.innerHTML = '';
+      authToken = null;
+      myUsername = null;
+    }
+
+    // ── Chat rendering ──────────────────────────────────────
     function renderMessage(entry) {
       const wrap = document.createElement('div');
       wrap.className = 'message' + (entry.user === myUsername ? ' own' : '');
@@ -181,59 +493,60 @@
       const meta = document.createElement('div');
       meta.className = 'meta';
       const time = new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      meta.textContent = `${entry.user} · ${time}`;
+      meta.textContent = entry.user + ' · ' + time;
 
       const text = document.createElement('div');
       text.className = 'text';
-      text.textContent = entry.msg;  // textContent prevents XSS
+      text.textContent = entry.msg;
 
       wrap.appendChild(meta);
       wrap.appendChild(text);
-      chat.appendChild(wrap);
-      chat.scrollTop = chat.scrollHeight;
+      messagesEl.appendChild(wrap);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
-    // ── Socket events ──────────────────────────────────────────────────────────
-    socket.on('welcome', ({ username, history }) => {
-      myUsername = username;
-      userDisplay.textContent = 'You are ' + username;
-      history.forEach(renderMessage);
+    // ── Chat error banner ───────────────────────────────────
+    function showChatError(msg) {
+      errorBanner.textContent = msg;
+      errorBanner.style.display = 'block';
+      clearTimeout(errorTimer);
+      errorTimer = setTimeout(() => { errorBanner.style.display = 'none'; }, 4000);
+    }
+
+    // ── Composer ────────────────────────────────────────────
+    msgInput.addEventListener('input', () => {
+      const len = msgInput.value.length;
+      charCount.textContent = len + '/' + MAX_LENGTH;
+      charCount.className = len >= MAX_LENGTH ? 'over' : len > MAX_LENGTH * 0.9 ? 'warn' : '';
     });
 
-    socket.on('chat message', renderMessage);
-
-    socket.on('error', showError);
-
-    // ── Connection lifecycle ───────────────────────────────────────────────────
-    socket.on('connect_error', () => {
-      userDisplay.textContent = '⚠ Connection failed — retrying…';
-    });
-
-    socket.on('disconnect', () => {
-      userDisplay.textContent = '⚠ Disconnected — reconnecting…';
-    });
-
-    socket.on('reconnect', () => {
-      // Page will receive a fresh 'welcome' with username & history on reconnect
-    });
-
-    // ── Send ───────────────────────────────────────────────────────────────────
     function sendMessage() {
-      const msg = input.value.trim();
-      if (!msg) return;
-      if (msg.length > MAX_LENGTH) {
-        showError(`Message too long (max ${MAX_LENGTH} characters).`);
-        return;
-      }
+      const msg = msgInput.value.trim();
+      if (!msg || !socket) return;
+      if (msg.length > MAX_LENGTH) { showChatError('Message too long.'); return; }
       socket.emit('chat message', msg);
-      input.value = '';
-      charCount.textContent = `0/${MAX_LENGTH}`;
+      msgInput.value = '';
+      charCount.textContent = '0/' + MAX_LENGTH;
       charCount.className = '';
     }
 
-    input.addEventListener('keyup', e => {
-      if (e.key === 'Enter') sendMessage();
+    msgInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     });
+
+    // ── Enter form on return key ────────────────────────────
+    ['auth-username', 'auth-password'].forEach(id => {
+      document.getElementById(id).addEventListener('keydown', e => {
+        if (e.key === 'Enter') submitAuth();
+      });
+    });
+
+    // ── Auto-login if token in sessionStorage ───────────────
+    if (authToken) {
+      // Optimistically enter chat; the socket middleware will bounce us
+      // back to login if the token is expired or tampered
+      enterChat();
+    }
   </script>
 </body>
 </html>

@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: techchat
+    runtime: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: ACCESS_KEY
+        sync: false   # means Render will prompt you to fill it in the dashboard

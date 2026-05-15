@@ -1,14 +1,16 @@
 {
-  "name": "chat-app",
-  "version": "1.0.0",
-  "description": "Styled chat app with usernames",
+  "name": "techchat",
+  "version": "2.0.0",
+  "description": "Secure chat with account auth and key file",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
+    "bcrypt": "^5.1.1",
     "express": "^4.18.2",
     "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
     "socket.io": "^4.7.2"
   }
 }
