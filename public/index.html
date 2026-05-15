@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <title>Chat</title>
   <style>
     body {
@@ -27,7 +28,6 @@
       flex: 1;
       padding: 1rem;
       overflow-y: auto;
-      background: #fff;
       background-color: #222;
     }
     .message {
@@ -37,103 +37,89 @@
       border-radius: 1rem;
       max-width: 80%;
     }
+    .message.own {
+      background: #2979ff22;
+      border: 1px solid #2979ff55;
+      margin-left: auto;
+    }
+    .message .meta {
+      font-size: 0.75em;
+      color: #666;
+      margin-bottom: 2px;
+    }
+    .message .text {
+      word-break: break-word;
+    }
+    #error-banner {
+      display: none;
+      background: #b71c1c;
+      color: #fff;
+      padding: 0.4rem 1rem;
+      font-size: 0.85em;
+      text-align: center;
+    }
+    #char-count {
+      font-size: 0.75em;
+      color: #888;
+      align-self: center;
+      white-space: nowrap;
+    }
+    #char-count.warn { color: #e65100; }
+    #char-count.over { color: #b71c1c; font-weight: bold; }
     footer {
       display: flex;
       padding: 1rem;
-      background: #eee;
       gap: 10px;
       background-color: #222;
+      align-items: center;
     }
     #message {
-  font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","Roboto","Oxygen","Ubuntu","Cantarell","Fira Sans","Droid Sans","Helvetica Neue",sans-serif;
-  color: #fff;
-  background-color: rgb(28,28,30);
-  box-shadow: 0 0 .4vw rgba(0,0,0,0.5), 0 0 0 .15vw transparent;
-  border-radius: 0.4vw;
-  border: none;
-  outline: none;
-  padding: 0.4vw;
-  width: 100%;
-  transition: .4s;;
-  border-radius: 10px;
+      font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","Roboto","Oxygen","Ubuntu","Cantarell","Fira Sans","Droid Sans","Helvetica Neue",sans-serif;
+      color: #fff;
+      background-color: rgb(28,28,30);
+      box-shadow: 0 0 .4vw rgba(0,0,0,0.5), 0 0 0 .15vw transparent;
+      border-radius: 0.4vw;
+      border: none;
+      outline: none;
+      padding: 0.4vw;
+      width: 100%;
+      transition: .4s;
+      border-radius: 10px;
     }
-    #message:hover {
-      box-shadow: 0 0 0 .15vw rgba(135, 207, 235, 0.186);
+    #message:hover { box-shadow: 0 0 0 .15vw rgba(135,207,235,0.186); }
+    #message:focus { box-shadow: 0 0 0 .15vw skyblue; }
+    button {
+      font-family: inherit;
+      font-size: 18px;
+      background: linear-gradient(to bottom, #4dc7d9 0%,#66a6ff 100%);
+      color: white;
+      padding: 0.8em 1.2em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 25px;
+      box-shadow: 0px 5px 10px rgba(0,0,0,0.2);
+      transition: all 0.3s;
     }
-    #message:focus {
-      box-shadow: 0 0 0 .15vw skyblue;
+    button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0px 8px 15px rgba(0,0,0,0.3);
+      padding: 0em;
+      background: linear-gradient(to bottom, #5bd9ec 0%,#97c3ff 100%);
+      cursor: pointer;
     }
-button {
-  font-family: inherit;
-  font-size: 18px;
-  background: linear-gradient(to bottom, #4dc7d9 0%,#66a6ff 100%);
-  color: white;
-  padding: 0.8em 1.2em;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 25px;
-  box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s;
-}
-
-button:hover {
-  transform: translateY(-3px);
-  box-shadow: 0px 8px 15px rgba(0, 0, 0, 0.3);
-  padding: 0em;
-  background: linear-gradient(to bottom, #5bd9ec 0%,#97c3ff 100%);
-  cursor: pointer;
-}
-
-button:active {
-  transform: scale(0.95);
-  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2);
-}
-
-button span {
-  display: block;
-  margin-left: 0.4em;
-  transition: all 0.3s;
-}
-
-button:hover span {
-  scale: 0;
-  font-size: 0%;
-  opacity: 0;
-  transition: all 0.5s;
-}
-
-button svg {
-  width: 18px;
-  height: 18px;
-  fill: white;
-  transition: all 0.3s;
-}
-
-button .svg-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.2);
-  transition: all 0.3s;
-}
-
-button:hover .svg-wrapper {
-  background-color: rgba(43, 169, 228, 0.897);
-  width: 54px;
-  height: 54px;
-}
-
-button:hover svg {
-  width: 25px;
-  height: 25px;
-  margin-right: 5px;
-  transform: rotate(45deg);
-}
+    button:active { transform: scale(0.95); box-shadow: 0px 2px 5px rgba(0,0,0,0.2); }
+    button span { display: block; margin-left: 0.4em; transition: all 0.3s; }
+    button:hover span { scale: 0; font-size: 0%; opacity: 0; transition: all 0.5s; }
+    button svg { width: 18px; height: 18px; fill: white; transition: all 0.3s; }
+    button .svg-wrapper {
+      display: flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; border-radius: 50%;
+      background-color: rgba(255,255,255,0.2); transition: all 0.3s;
+    }
+    button:hover .svg-wrapper { background-color: rgba(43,169,228,0.897); width: 54px; height: 54px; }
+    button:hover svg { width: 25px; height: 25px; margin-right: 5px; transform: rotate(45deg); }
   </style>
 </head>
 <body>
@@ -141,50 +127,99 @@ button:hover svg {
     <h1>Chat</h1>
     <div id="username">Connecting...</div>
   </header>
+  <div id="error-banner"></div>
   <div id="chat"></div>
   <footer>
-    <input id="message" autocomplete="off" placeholder="Type your message..." />
-<button onclick="sendMessage()">
-  <div class="svg-wrapper-1">
-    <div class="svg-wrapper">
-      <svg height="24" width="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path d="M0 0h24v24H0z" fill="none"></path>
-        <path d="M1.946 9.315c-.522-.174-.527-.455.01-.634l19.087-6.362c.529-.176.832.12.684.638l-5.454 19.086c-.15.529-.455.547-.679.045L12 14l6-8-8 6-8.054-2.685z" fill="currentColor"></path>
-      </svg>
-    </div>
-  </div>
-  <span>Send</span>
-</button>
+    <input id="message" autocomplete="off" placeholder="Type your message..." maxlength="500" />
+    <span id="char-count">0/500</span>
+    <button onclick="sendMessage()">
+      <div class="svg-wrapper-1">
+        <div class="svg-wrapper">
+          <svg height="24" width="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0 0h24v24H0z" fill="none"></path>
+            <path d="M1.946 9.315c-.522-.174-.527-.455.01-.634l19.087-6.362c.529-.176.832.12.684.638l-5.454 19.086c-.15.529-.455.547-.679.045L12 14l6-8-8 6-8.054-2.685z" fill="currentColor"></path>
+          </svg>
+        </div>
+      </div>
+      <span>Send</span>
+    </button>
+  </footer>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
+    const MAX_LENGTH = 500;
     const socket = io();
-    const chat = document.getElementById('chat');
-    const messageInput = document.getElementById('message');
-    const usernameDisplay = document.getElementById('username');
+    const chat    = document.getElementById('chat');
+    const input   = document.getElementById('message');
+    const userDisplay  = document.getElementById('username');
+    const charCount    = document.getElementById('char-count');
+    const errorBanner  = document.getElementById('error-banner');
 
-    socket.on('welcome', username => {
-      usernameDisplay.textContent = "You are " + username;
+    let myUsername = null;
+    let errorTimer = null;
+
+    // ── Character counter ──────────────────────────────────────────────────────
+    input.addEventListener('input', () => {
+      const len = input.value.length;
+      charCount.textContent = `${len}/${MAX_LENGTH}`;
+      charCount.className = len > MAX_LENGTH * 0.9 ? (len >= MAX_LENGTH ? 'over' : 'warn') : '';
     });
 
-    socket.on('chat message', msg => {
-      const item = document.createElement('div');
-      item.className = 'message';
-      item.textContent = msg;
-      chat.appendChild(item);
-      chat.scrollTop = chat.scrollHeight;
-    });
-
-    function sendMessage() {
-      const msg = messageInput.value;
-      if (msg.trim()) {
-        socket.emit('chat message', msg);
-        messageInput.value = '';
-      }
+    // ── Show a dismissing error banner ─────────────────────────────────────────
+    function showError(msg) {
+      errorBanner.textContent = msg;
+      errorBanner.style.display = 'block';
+      clearTimeout(errorTimer);
+      errorTimer = setTimeout(() => { errorBanner.style.display = 'none'; }, 4000);
     }
 
-    messageInput.addEventListener("keyup", e => {
-      if (e.key === "Enter") sendMessage();
+    // ── Render a single message entry safely (no innerHTML) ────────────────────
+    function renderMessage(entry) {
+      const wrap = document.createElement('div');
+      wrap.className = 'message' + (entry.user === myUsername ? ' own' : '');
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      const time = new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      meta.textContent = `${entry.user} · ${time}`;
+
+      const text = document.createElement('div');
+      text.className = 'text';
+      text.textContent = entry.msg;  // textContent prevents XSS
+
+      wrap.appendChild(meta);
+      wrap.appendChild(text);
+      chat.appendChild(wrap);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    // ── Socket events ──────────────────────────────────────────────────────────
+    socket.on('welcome', ({ username, history }) => {
+      myUsername = username;
+      userDisplay.textContent = 'You are ' + username;
+      history.forEach(renderMessage);
+    });
+
+    socket.on('chat message', renderMessage);
+
+    socket.on('error', showError);
+
+    // ── Send ───────────────────────────────────────────────────────────────────
+    function sendMessage() {
+      const msg = input.value.trim();
+      if (!msg) return;
+      if (msg.length > MAX_LENGTH) {
+        showError(`Message too long (max ${MAX_LENGTH} characters).`);
+        return;
+      }
+      socket.emit('chat message', msg);
+      input.value = '';
+      charCount.textContent = `0/${MAX_LENGTH}`;
+      charCount.className = '';
+    }
+
+    input.addEventListener('keyup', e => {
+      if (e.key === 'Enter') sendMessage();
     });
   </script>
 </body>
