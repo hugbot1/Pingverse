@@ -331,6 +331,7 @@
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
+<script src="/socket.io/socket.io.js"></script>
 <script>
 // ── State ────────────────────────────────────────────────────────────────────
 const MAX_LEN   = 500;
@@ -360,16 +361,18 @@ function switchTab(mode) {
   document.getElementById('tab-login').classList.toggle('active', mode === 'login');
   document.getElementById('tab-register').classList.toggle('active', mode === 'register');
   authBtn.textContent = mode === 'login' ? 'Sign In' : 'Create Account';
-  document.getElementById('f-password').autocomplete =
-    mode === 'login' ? 'current-password' : 'new-password';
+  
+  const pwInput = document.getElementById('f-password');
+  if (pwInput) {
+    pwInput.autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+  }
   hideAuthAlert();
-} // <--- YOU WERE MISSING THIS BRACE
+}
 
 // ── Key file ─────────────────────────────────────────────────────────────────
 function readKeyFile(file) {
   const reader = new FileReader();
   reader.onload = e => {
-    // readAsDataURL gives "data:...;base64,<data>" — we just want the base64 part
     keyB64 = e.target.result.split(',')[1];
     keyZone.classList.add('ok');
     keyLabel.textContent = '✓ ' + file.name;
@@ -377,14 +380,19 @@ function readKeyFile(file) {
   reader.readAsDataURL(file);
 }
 
-keyInput.addEventListener('change', () => { if (keyInput.files[0]) readKeyFile(keyInput.files[0]); });
-keyZone.addEventListener('dragover',  e => { e.preventDefault(); keyZone.classList.add('drag-over'); });
-keyZone.addEventListener('dragleave', () => keyZone.classList.remove('drag-over'));
-keyZone.addEventListener('drop', e => {
-  e.preventDefault();
-  keyZone.classList.remove('drag-over');
-  if (e.dataTransfer.files[0]) readKeyFile(e.dataTransfer.files[0]);
-});
+if (keyInput) {
+  keyInput.addEventListener('change', () => { if (keyInput.files[0]) readKeyFile(keyInput.files[0]); });
+}
+
+if (keyZone) {
+  keyZone.addEventListener('dragover',  e => { e.preventDefault(); keyZone.classList.add('drag-over'); });
+  keyZone.addEventListener('dragleave', () => keyZone.classList.remove('drag-over'));
+  keyZone.addEventListener('drop', e => {
+    e.preventDefault();
+    keyZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) readKeyFile(e.dataTransfer.files[0]);
+  });
+}
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 function showAuthAlert(msg) {
@@ -412,16 +420,21 @@ async function doAuth() {
       body:    JSON.stringify({ username, password, keyFile: keyB64 }),
     });
     const data = await res.json();
-    if (!res.ok) { showAuthAlert(data.error || 'Something went wrong.'); return; }
+    
+    if (!res.ok) { 
+      showAuthAlert(data.error || 'Something went wrong.'); 
+      authBtn.disabled = false;
+      authBtn.textContent = authMode === 'login' ? 'Sign In' : 'Create Account';
+      return; 
+    }
 
     sessionStorage.setItem('tc_token', data.token);
     myUsername = data.username;
     enterChat(data.token);
 
-  } catch {
+  } catch (err) {
     showAuthAlert('Could not reach the server.');
-  } finally {
-    authBtn.disabled    = false;
+    authBtn.disabled = false;
     authBtn.textContent = authMode === 'login' ? 'Sign In' : 'Create Account';
   }
 }
@@ -436,13 +449,12 @@ function enterChat(token) {
   socket.on('welcome', ({ username, history }) => {
     myUsername = username;
     userBadge.textContent = username;
+    messagesEl.innerHTML = ''; 
     history.forEach(appendMessage);
   });
 
   socket.on('chat message', appendMessage);
-
   socket.on('error', msg => showChatError(msg));
-
   socket.on('kicked', msg => {
     showChatError('Kicked: ' + msg);
     setTimeout(doSignOut, 2500);
@@ -476,16 +488,13 @@ function doSignOut() {
 function appendMessage(entry) {
   const wrap = document.createElement('div');
   wrap.className = 'msg' + (entry.user === myUsername ? ' own' : '');
-
   const meta = document.createElement('div');
   meta.className = 'meta';
   const t = new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   meta.textContent = entry.user + ' · ' + t;
-
   const body = document.createElement('div');
   body.className = 'body';
-  body.textContent = entry.msg;   // textContent = XSS-safe
-
+  body.textContent = entry.msg;
   wrap.append(meta, body);
   messagesEl.appendChild(wrap);
   messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -500,15 +509,16 @@ function showChatError(msg) {
 }
 
 // ── Composer ──────────────────────────────────────────────────────────────────
-msgInput.addEventListener('input', () => {
-  const left = MAX_LEN - msgInput.value.length;
-  charCount.textContent = left;
-  charCount.className   = left < 0 ? 'over' : left < 50 ? 'warn' : '';
-});
-
-msgInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
-});
+if (msgInput) {
+  msgInput.addEventListener('input', () => {
+    const left = MAX_LEN - msgInput.value.length;
+    charCount.textContent = left;
+    charCount.className   = left < 0 ? 'over' : left < 50 ? 'warn' : '';
+  });
+  msgInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
+  });
+}
 
 function doSend() {
   const msg = msgInput.value.trim();
@@ -520,16 +530,22 @@ function doSend() {
   charCount.className   = '';
 }
 
-// ── Auth form enter key ───────────────────────────────────────────────────────
-['f-username','f-password'].forEach(id =>
-  document.getElementById(id).addEventListener('keydown', e => {
-    if (e.key === 'Enter') doAuth();
-  })
-);
+// ── FIXED EVENT LISTENERS ─────────────────────────────────────────────────────
+// The original code crashed here because it didn't check if the elements existed.
+['f-username', 'f-password'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter') doAuth();
+    });
+  }
+});
 
-// ── Auto-login from sessionStorage ───────────────────────────────────────────
-const saved = sessionStorage.getItem('tc_token');
-if (saved) enterChat(saved);
+// ── Auto-login ───────────────────────────────────────────────────────────────
+window.onload = () => {
+  const saved = sessionStorage.getItem('tc_token');
+  if (saved) enterChat(saved);
+};
 </script>
 </body>
 </html>
