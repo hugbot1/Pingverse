@@ -99,7 +99,6 @@ function enterChat(token) {
 
   socket.on('status change', () => socket.emit('get users'));
   
-  // PATCHED: User list now shows (Owner)
   socket.on('user list', (list) => {
     document.getElementById('user-list').innerHTML = list.map(u => `
       <div class="user-item">
@@ -118,7 +117,6 @@ function applyFilter() {
   if(sort === 'new') filtered.sort((a,b) => new Date(a.ts) - new Date(b.ts));
   else filtered.sort((a,b) => new Date(b.ts) - new Date(a.ts));
 
-  // PATCHED: Messages now show (Owner)
   document.getElementById('messages').innerHTML = filtered.map(m => `
     <div class="msg ${m.user === myUsername ? 'own' : ''}">
       <span class="msg-meta">

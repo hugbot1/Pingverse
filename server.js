@@ -21,14 +21,12 @@ mongoose.connect(MONGO_URI)
   .then(() => console.log("Connected to MongoDB"))
   .catch(err => console.error("DB Error:", err));
 
-// Added 'role' to User Schema
 const User = mongoose.model('User', new mongoose.Schema({
   username: { type: String, unique: true, required: true },
   hash: { type: String, required: true },
   role: { type: String, default: 'user' }
 }));
 
-// Added 'role' to Message Schema for persistence
 const Message = mongoose.model('Message', new mongoose.Schema({
   user: String,
   msg: String,
@@ -74,7 +72,6 @@ app.post('/auth/register', authLimiter, async (req, res) => {
 
   try {
     const hash = await bcrypt.hash(password, 10);
-    // Save role to user document
     await new User({ username, hash, role }).save();
     res.json({ token: jwt.sign({ username, role }, JWT_SECRET, { expiresIn: '24h' }), username, role });
   } catch (err) {
@@ -92,7 +89,6 @@ app.post('/auth/login', authLimiter, async (req, res) => {
   if (!user || !(await bcrypt.compare(password, user.hash))) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
-  // Ensure token always has current role
   res.json({ token: jwt.sign({ username, role }, JWT_SECRET, { expiresIn: '24h' }), username, role });
 });
 
@@ -121,7 +117,6 @@ io.on('connection', async (socket) => {
   socket.on('chat message', async (raw) => {
     const msg = raw.toString().trim().substring(0, 500);
     if (!msg) return;
-    // Save message with the sender's role
     const entry = await new Message({ user: name, msg, role: role }).save();
     io.emit('chat message', entry);
   });
@@ -141,7 +136,6 @@ io.on('connection', async (socket) => {
   });
 
   socket.on('get users', async () => {
-    // Fetch both username AND role for the list
     const all = await User.find({}, 'username role');
     socket.emit('user list', all.map(u => ({ 
       name: u.username, 
