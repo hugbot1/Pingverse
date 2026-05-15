@@ -134,7 +134,7 @@ function enterChat(token) {
       const adminActions = (myRole === 'admin' && u.name !== myUsername) ? `
         <div style="margin-top:4px; display:flex; gap:5px;">
           <button onclick="event.stopPropagation(); timeoutUser('${u.name}')" style="background:#333; font-size:10px; color:#fff; border:none; padding:2px 4px; border-radius:3px;">Timeout</button>
-          <button onclick="event.stopPropagation(); terminateAccount('${u.name}')" style="background:var(--danger); font-size:10px; color:#fff; border:none; padding:2px 4px; border-radius:3px;">Delete Acc</button>
+          <button onclick="event.stopPropagation(); terminateAccount('${u.name}')" style="background:var(--danger); font-size:10px; color:#fff; border:none; padding:2px 4px; border-radius:3px;">Delete Account</button>
         </div>
       ` : '';
 
