@@ -50,16 +50,29 @@ const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 
 app.post('/auth/register', authLimiter, async (req, res) => {
   const { username, password, keyFile } = req.body;
+  
   try {
-    const provided = Buffer.from(keyFile, 'base64');
-    const SERVER_KEY_BYTES = Buffer.from(ACCESS_KEY || '', 'utf8');
-    if (!crypto.timingSafeEqual(SERVER_KEY_BYTES, provided)) return res.status(403).json({ error: 'Invalid Key' });
+    // 1. Decode the base64 string sent from the client
+    const providedKeyBuffer = Buffer.from(keyFile, 'base64');
+    const providedKeyString = providedKeyBuffer.toString('utf8').trim();
+
+    // 2. Get your Secret Key from Environment Variables
+    const expectedKey = (process.env.ACCESS_KEY || '').trim();
+
+    // 3. Strict Verification
+    // We use a simple string comparison or timingSafeEqual if you want to be hardcore
+    if (!expectedKey || providedKeyString !== expectedKey) {
+      return res.status(403).json({ error: 'Invalid Key File' });
+    }
 
     const hash = await bcrypt.hash(password, 10);
-    await new User({ username, hash }).save();
+    const newUser = new User({ username, hash });
+    await newUser.save();
+    
     res.json({ token: jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' }), username });
   } catch (err) {
-    res.status(400).json({ error: err.code === 11000 ? 'User exists' : 'Error' });
+    if (err.code === 11000) return res.status(400).json({ error: 'User exists' });
+    res.status(500).json({ error: 'Registration failed' });
   }
 });
 

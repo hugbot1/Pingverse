@@ -16,14 +16,21 @@ const switchTab = (m) => {
   document.getElementById('auth-btn').innerText = m==='login' ? 'Sign In' : 'Create Account';
 };
 
-const handleFile = (f) => {
-  const r = new FileReader();
-  r.onload = e => { 
-    keyB64 = e.target.result.split(',')[1];
+const handleFile = (files) => {
+  if (!files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => { 
+    // This splits "data:text/plain;base64,S0VZU1RSRUFN" and takes "S0VZU1RSRUFN"
+    const base64Data = e.target.result.split(',')[1];
+    if (!base64Data) {
+        alert("Invalid file format");
+        return;
+    }
+    keyB64 = base64Data;
     document.getElementById('key-zone').classList.add('ok');
-    document.getElementById('key-label').innerText = "✓ Key Ready";
+    document.getElementById('key-label').innerText = "✓ Key Loaded";
   };
-  r.readAsDataURL(f[0]);
+  reader.readAsDataURL(files[0]);
 };
 
 async function doAuth() {
