@@ -11,6 +11,7 @@ const rateLimit = require('express-rate-limit');
 const app    = express();
 const server = http.createServer(app);
 
+// ── Database Connection ──────────────────────────────────────────────────────
 const MONGO_URI = process.env.DATABASE_URL;
 if (!MONGO_URI) {
   console.error("FATAL: DATABASE_URL environment variable not set.");
@@ -21,7 +22,6 @@ mongoose.connect(MONGO_URI)
   .then(() => console.log("Connected to Cloud MongoDB"))
   .catch(err => console.error("Database connection error:", err));
 
-// Database Schemas
 const userSchema = new mongoose.Schema({
   username: { type: String, unique: true, required: true },
   hash: { type: String, required: true }
@@ -35,6 +35,7 @@ const msgSchema = new mongoose.Schema({
 });
 const Message = mongoose.model('Message', msgSchema);
 
+// ── Security & Middleware ─────────────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -56,84 +57,73 @@ const authLimiter = rateLimit({
   message: { error: 'Too many attempts, please try again later.' }
 });
 
-if (!process.env.ACCESS_KEY) {
-  console.error('FATAL: ACCESS_KEY environment variable not set.');
-  process.exit(1);
-}
-const SERVER_KEY_BYTES = Buffer.from(process.env.ACCESS_KEY, 'utf8');
+const ACCESS_KEY = process.env.ACCESS_KEY;
+const SERVER_KEY_BYTES = Buffer.from(ACCESS_KEY || '', 'utf8');
 const JWT_SECRET = 'super-secret-key'; 
 
 function generateToken(username) {
   return jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' });
 }
 
+// ── Auth Routes ───────────────────────────────────────────────────────────────
 app.post('/auth/register', authLimiter, async (req, res) => {
   const { username, password, keyFile } = req.body;
-  if (!username || !password || !keyFile) return res.status(400).json({ error: 'Missing fields' });
-
+  
   try {
     const provided = Buffer.from(keyFile, 'base64');
-    if (provided.length !== SERVER_KEY_BYTES.length || !crypto.timingSafeEqual(SERVER_KEY_BYTES, provided)) {
+    if (!crypto.timingSafeEqual(SERVER_KEY_BYTES, provided)) {
       return res.status(403).json({ error: 'Invalid Key File' });
     }
-  } catch (e) { return res.status(400).json({ error: 'Invalid key format' }); }
 
-  try {
     const hash = await bcrypt.hash(password, 10);
     const newUser = new User({ username, hash });
     await newUser.save();
     res.json({ token: generateToken(username), username });
   } catch (err) {
-    res.status(400).json({ error: 'Username already exists' });
+    if (err.code === 11000) return res.status(400).json({ error: 'User exists' });
+    res.status(500).json({ error: 'Registration failed' });
   }
 });
 
 app.post('/auth/login', authLimiter, async (req, res) => {
   const { username, password, keyFile } = req.body;
-
-  try {
-    const provided = Buffer.from(keyFile, 'base64');
-    if (provided.length !== SERVER_KEY_BYTES.length || !crypto.timingSafeEqual(SERVER_KEY_BYTES, provided)) {
-      return res.status(403).json({ error: 'Invalid Key File' });
-    }
-  } catch (e) { return res.status(400).json({ error: 'Invalid key format' }); }
-
   const user = await User.findOne({ username });
   if (!user || !(await bcrypt.compare(password, user.hash))) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
-
   res.json({ token: generateToken(username), username });
 });
 
+// ── Socket.io ────────────────────────────────────────────────────────────────
 const io = new Server(server);
 
 io.use((socket, next) => {
-  const token = socket.handshake.auth?.token;
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(socket.handshake.auth?.token, JWT_SECRET);
     socket.username = payload.username;
     next();
-  } catch (err) {
-    next(new Error('Unauthorised'));
-  }
+  } catch { next(new Error('Unauthorised')); }
 });
 
 io.on('connection', async (socket) => {
-  const { username } = socket;
+  // Load initial history
+  const history = await Message.find().sort({ ts: -1 }).limit(100);
+  socket.emit('welcome', { username: socket.username, history: history.reverse() });
 
-  const history = await Message.find().sort({ ts: -1 }).limit(50);
-  socket.emit('welcome', { username, history: history.reverse() });
-
+  // Handle new messages
   socket.on('chat message', async (raw) => {
     const msg = raw.toString().trim().substring(0, 500);
     if (!msg) return;
-
-    const entry = new Message({ user: username, msg });
+    const entry = new Message({ user: socket.username, msg });
     await entry.save();
     io.emit('chat message', entry);
   });
+
+  // Provide user list for search
+  socket.on('get users', async () => {
+    const allUsers = await User.find({}, 'username');
+    socket.emit('user list', allUsers.map(u => u.username));
+  });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(process.env.PORT || 3000, () => console.log("Server Live"));

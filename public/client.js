@@ -1,102 +1,103 @@
-// public/client.js
-let authMode = 'login';
-let keyB64 = null;
-let socket = null;
+let authMode = 'login', keyB64 = null, socket = null, myUsername = null, fullHistory = [];
 
-// Use a getter or wait for DOM to ensure these aren't null if the script loads fast
-const getAuthBtn = () => document.getElementById('auth-btn');
-const getAuthAlert = () => document.getElementById('auth-alert');
+const switchTab = (m) => {
+  authMode = m;
+  document.getElementById('tab-login').classList.toggle('active', m==='login');
+  document.getElementById('tab-register').classList.toggle('active', m==='register');
+  document.getElementById('auth-btn').innerText = m==='login' ? 'Sign In' : 'Create Account';
+};
 
-function switchTab(mode) {
-  authMode = mode;
-  document.getElementById('tab-login').classList.toggle('active', mode === 'login');
-  document.getElementById('tab-register').classList.toggle('active', mode === 'register');
-  const btn = getAuthBtn();
-  if (btn) btn.innerText = mode === 'login' ? 'Sign In' : 'Create Account';
-}
-
-// Ensure the key zone click works
-document.addEventListener('DOMContentLoaded', () => {
-  const keyZone = document.getElementById('key-zone');
-  if (keyZone) {
-    keyZone.onclick = () => document.getElementById('key-input').click();
-  }
-});
-
-function handleFile(files) {
-  const reader = new FileReader();
-  reader.onload = e => {
+const handleFile = (f) => {
+  const r = new FileReader();
+  r.onload = e => { 
     keyB64 = e.target.result.split(',')[1];
     document.getElementById('key-zone').classList.add('ok');
-    document.getElementById('key-label').innerText = "✓ Key Loaded";
+    document.getElementById('key-label').innerText = "✓ Key Ready";
   };
-  reader.readAsDataURL(files[0]);
-}
+  r.readAsDataURL(f[0]);
+};
 
 async function doAuth() {
   const username = document.getElementById('f-username').value;
   const password = document.getElementById('f-password').value;
-  if (!username || !password || !keyB64) return alert("Fill all fields and upload Key File");
+  if(!username || !password || !keyB64) return alert("Missing info");
 
-  const btn = getAuthBtn();
-  btn.disabled = true;
   try {
-    const res = await fetch('/auth/' + authMode, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, keyFile: keyB64 })
+    const res = await fetch('/auth/'+authMode, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({username, password, keyFile:keyB64})
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-
+    if(!res.ok) throw new Error(data.error);
     sessionStorage.setItem('tc_token', data.token);
     enterChat(data.token, data.username);
-  } catch (err) {
-    const alertEl = getAuthAlert();
-    alertEl.innerText = err.message;
-    alertEl.style.display = 'block';
-  } finally {
-    btn.disabled = false;
-  }
+  } catch(e) { document.getElementById('auth-alert').innerText = e.message; document.getElementById('auth-alert').style.display='block'; }
 }
 
-function enterChat(token, username) {
+function enterChat(token, user) {
+  myUsername = user;
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('chat-screen').style.display = 'flex';
-  document.getElementById('user-badge').innerText = username;
+  document.getElementById('user-badge').innerText = user;
 
   socket = io({ auth: { token } });
-  socket.on('welcome', ({ history }) => {
-    document.getElementById('messages').innerHTML = '';
-    history.forEach(appendMessage);
+  socket.on('welcome', ({ history }) => { 
+    fullHistory = history; 
+    applyFilter(); 
+    socket.emit('get users');
   });
-  socket.on('chat message', appendMessage);
-  socket.on('kicked', (msg) => { alert(msg); doSignOut(); });
+  socket.on('chat message', (msg) => { fullHistory.push(msg); applyFilter(); });
+  socket.on('user list', (list) => {
+    const container = document.getElementById('user-list');
+    container.innerHTML = list.map(u => `<div class="user-item">${u}</div>`).join('');
+  });
 }
 
-function appendMessage(msg) {
-  const div = document.createElement('div');
-  div.className = 'msg';
-  // Use textContent to prevent XSS (Security best practice)
-  div.textContent = `${msg.user}: ${msg.msg}`;
+function applyFilter() {
+  const query = document.getElementById('s-content').value.toLowerCase();
+  const userQ = document.getElementById('s-user').value.toLowerCase();
+  const sort = document.getElementById('s-sort').value;
+
+  let filtered = fullHistory.filter(m => 
+    m.msg.toLowerCase().includes(query) && m.user.toLowerCase().includes(userQ)
+  );
+  
+  if(sort === 'old') filtered.sort((a,b) => new Date(a.ts) - new Date(b.ts));
+  else filtered.sort((a,b) => new Date(b.ts) - new Date(a.ts));
+
   const container = document.getElementById('messages');
-  container.appendChild(div);
+  container.innerHTML = filtered.map(m => `
+    <div class="msg ${m.user === myUsername ? 'own' : ''}">
+      <span class="msg-meta">${m.user}</span>
+      <span>${m.msg}</span>
+      <span class="msg-time">${new Date(m.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+    </div>
+  `).join('');
   container.scrollTop = container.scrollHeight;
 }
 
-function doSend() {
-  const input = document.getElementById('msg-input');
-  if (!input.value.trim()) return;
-  socket.emit('chat message', input.value);
-  input.value = '';
+function toggleSearch() { 
+  const p = document.getElementById('search-panel');
+  p.style.display = p.style.display === 'none' ? 'flex' : 'none';
 }
 
-function doSignOut() {
-  sessionStorage.removeItem('tc_token');
-  location.reload();
+function filterUsers() {
+  const q = document.getElementById('user-search').value.toLowerCase();
+  document.querySelectorAll('.user-item').forEach(i => {
+    i.style.display = i.innerText.toLowerCase().includes(q) ? 'block' : 'none';
+  });
 }
+
+function doSend() {
+  const i = document.getElementById('msg-input');
+  if(!i.value.trim()) return;
+  socket.emit('chat message', i.value);
+  i.value = '';
+}
+
+function doSignOut() { sessionStorage.clear(); location.reload(); }
 
 window.onload = () => {
-  const token = sessionStorage.getItem('tc_token');
-  if (token) enterChat(token, 'User');
-}
+  const t = sessionStorage.getItem('tc_token');
+  if(t) enterChat(t, 'User');
+};
