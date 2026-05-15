@@ -72,6 +72,59 @@
 
   #back-btn { display: none; background: none; border: 1px solid var(--accent); color: var(--accent); padding: 5px 12px; border-radius: 4px; cursor: pointer; margin-right: 12px; font-size: 0.8rem; font-weight: bold; }
   #back-btn:hover { background: rgba(0, 168, 132, 0.1); }
+
+  /* PATCHED: Clear Profile & Settings Footer Layout */
+  .sidebar-footer {
+    padding: 12px 15px; 
+    border-top: 1px solid #222; 
+    background: #111416;
+    display: flex; 
+    flex-direction: column;
+    gap: 10px;
+  }
+  .profile-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #1e2327;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid #2a3338;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .profile-section:hover {
+    border-color: var(--accent);
+    background: #242a30;
+  }
+  .profile-info {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: 180px;
+  }
+  .settings-trigger-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .gear-icon {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    transition: color 0.2s, transform 0.3s ease;
+  }
+  .profile-section:hover .gear-icon {
+    color: var(--accent);
+    transform: rotate(45deg);
+  }
+  .logout-row {
+    display: flex;
+    justify-content: flex-end;
+    padding-right: 5px;
+  }
 </style>
 </head>
 <body>
@@ -110,15 +163,23 @@
     <div id="user-list" class="user-list"></div>
     
     <div id="admin-tools">
-      <p style="font-size:0.65rem; color:var(--accent); margin-bottom:8px; font-weight:bold;">MANAGEMENT</p>
+      <p style="font-size:0.65rem; color:var(--accent); margin-bottom:8px; font-weight:bold;">Set News</p>
       <input id="bc-input" placeholder="Top message..." style="font-size:0.75rem; padding:8px; margin-bottom:8px;">
       <label class="admin-label" style="font-size:0.75rem;"><input type="checkbox" id="bc-check"> <span>Important</span></label>
       <button class="btn" onclick="updateBroadcast()" style="padding:8px; font-size:0.75rem;">Set Message</button>
     </div>
 
-    <div style="padding:15px; border-top:1px solid #222; display:flex; justify-content:space-between; align-items: center;">
-      <span id="user-badge" onclick="openSettings()" style="color:var(--accent); font-weight: bold; cursor:pointer" title="Settings">...</span>
-      <button onclick="doSignOut()" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size: 0.8rem;">Logout</button>
+    <div class="sidebar-footer">
+      <div class="profile-section" onclick="openSettings()" title="Open Account Settings">
+        <div class="profile-info">
+          <span class="settings-trigger-label">My Account</span>
+          <span id="user-badge" style="color:var(--accent); font-weight: bold; font-size: 0.9rem;">...</span>
+        </div>
+        <span class="gear-icon">▶</span>
+      </div>
+      <div class="logout-row">
+        <button onclick="doSignOut()" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size: 0.75rem; font-weight: 500; opacity: 0.8;">Logout</button>
+      </div>
     </div>
   </div>
 
@@ -126,7 +187,7 @@
     <div class="chat-header">
       <div style="display:flex; align-items:center">
         <button id="back-btn" onclick="exitPrivate()">← Back</button>
-        <span id="chat-title">Global Chat</span>
+        <span id="chat-title">Chat</span>
       </div>
       <button onclick="toggleSearch()" style="background:none; border:1px solid var(--accent); color:var(--accent); padding:4px 8px; border-radius:4px; cursor:pointer">Search</button>
     </div>

@@ -167,7 +167,7 @@ function startPrivate(target) {
 
 function exitPrivate() {
   activePrivateUser = null;
-  document.getElementById('chat-title').innerText = "Global Chat";
+  document.getElementById('chat-title').innerText = "Chat";
   document.getElementById('back-btn').style.display = 'none';
   applyFilter();
   scrollToBottomInstant();
