@@ -16,40 +16,53 @@ const switchTab = (m) => {
   document.getElementById('auth-btn').innerText = m==='login' ? 'Sign In' : 'Create Account';
 };
 
-const handleFile = (files) => {
-  if (!files[0]) return;
-  const reader = new FileReader();
-  reader.onload = e => { 
-    // This splits "data:text/plain;base64,S0VZU1RSRUFN" and takes "S0VZU1RSRUFN"
-    const base64Data = e.target.result.split(',')[1];
-    if (!base64Data) {
-        alert("Invalid file format");
-        return;
+const handleFile = (f) => {
+  if (!f[0]) return;
+  const r = new FileReader();
+  r.onload = e => { 
+    // IMPORTANT: Remove the "data:text/plain;base64," header
+    const parts = e.target.result.split(',');
+    if (parts.length > 1) {
+      keyB64 = parts[1];
+      document.getElementById('key-zone').classList.add('ok');
+      document.getElementById('key-label').innerText = "✓ Key Ready";
     }
-    keyB64 = base64Data;
-    document.getElementById('key-zone').classList.add('ok');
-    document.getElementById('key-label').innerText = "✓ Key Loaded";
   };
-  reader.readAsDataURL(files[0]);
+  r.readAsDataURL(f[0]);
 };
 
 async function doAuth() {
   const username = document.getElementById('f-username').value;
   const password = document.getElementById('f-password').value;
-  if(!username || !password || (authMode === 'register' && !keyB64)) return alert("Fill all fields");
+  
+  // Requirement: Username, Password, AND the Key File must be present
+  if(!username || !password || !keyB64) {
+    const el = document.getElementById('auth-alert');
+    el.innerText = "All fields and the Security Key are required.";
+    el.style.display = 'block';
+    return;
+  }
 
   try {
-    const res = await fetch('/auth/'+authMode, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({username, password, keyFile:keyB64})
+    const res = await fetch('/auth/' + authMode, {
+      method: 'POST', 
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        username, 
+        password, 
+        keyFile: keyB64 // Now sent for both login and register
+      })
     });
+    
     const data = await res.json();
     if(!res.ok) throw new Error(data.error);
+    
     sessionStorage.setItem('tc_token', data.token);
     enterChat(data.token, data.username);
   } catch(e) { 
     const el = document.getElementById('auth-alert');
-    el.innerText = e.message; el.style.display='block'; 
+    el.innerText = e.message; 
+    el.style.display = 'block'; 
   }
 }
 

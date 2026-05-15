@@ -12,7 +12,10 @@ const app    = express();
 const server = http.createServer(app);
 
 const MONGO_URI = process.env.DATABASE_URL;
-const ACCESS_KEY = process.env.ACCESS_KEY;
+const EXPECTED_KEY = process.env.ACCESS_KEY;
+if (!EXPECTED_KEY) {
+  console.warn("WARNING: ACCESS_KEY is not set in environment variables!");
+}
 const JWT_SECRET = process.env.JWT_SECRET;
 const onlineUsers = new Set();
 
@@ -50,37 +53,61 @@ const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 
 app.post('/auth/register', authLimiter, async (req, res) => {
   const { username, password, keyFile } = req.body;
-  
+
   try {
-    // 1. Decode the base64 string sent from the client
-    const providedKeyBuffer = Buffer.from(keyFile, 'base64');
-    const providedKeyString = providedKeyBuffer.toString('utf8').trim();
-
-    // 2. Get your Secret Key from Environment Variables
-    const expectedKey = (process.env.ACCESS_KEY || '').trim();
-
-    // 3. Strict Verification
-    // We use a simple string comparison or timingSafeEqual if you want to be hardcore
-    if (!expectedKey || providedKeyString !== expectedKey) {
-      return res.status(403).json({ error: 'Invalid Key File' });
+    // 1. Check if the server even has a key configured
+    if (!EXPECTED_KEY) {
+      return res.status(500).json({ error: 'Server security misconfigured' });
     }
 
+    // 2. Check if a key was provided
+    if (!keyFile) {
+      return res.status(403).json({ error: 'Key file required for registration' });
+    }
+
+    // 3. Decode and Verify
+    const providedKey = Buffer.from(keyFile, 'base64').toString('utf8').trim();
+    
+    if (providedKey !== EXPECTED_KEY.trim()) {
+      return res.status(403).json({ error: 'Invalid Key File: Access Denied' });
+    }
+
+    // 4. Proceed with User Creation
     const hash = await bcrypt.hash(password, 10);
     const newUser = new User({ username, hash });
     await newUser.save();
     
     res.json({ token: jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' }), username });
   } catch (err) {
-    if (err.code === 11000) return res.status(400).json({ error: 'User exists' });
+    if (err.code === 11000) return res.status(400).json({ error: 'Username already taken' });
     res.status(500).json({ error: 'Registration failed' });
   }
 });
 
 app.post('/auth/login', authLimiter, async (req, res) => {
-  const { username, password } = req.body;
-  const user = await User.findOne({ username });
-  if (!user || !(await bcrypt.compare(password, user.hash))) return res.status(401).json({ error: 'Invalid creds' });
-  res.json({ token: jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' }), username });
+  const { username, password, keyFile } = req.body; // Added keyFile here
+
+  try {
+    // 1. Strict Key Verification (Same as registration)
+    if (!EXPECTED_KEY) return res.status(500).json({ error: 'Server security misconfigured' });
+    if (!keyFile) return res.status(403).json({ error: 'Key file required for access' });
+
+    const providedKey = Buffer.from(keyFile, 'base64').toString('utf8').trim();
+    if (providedKey !== EXPECTED_KEY.trim()) {
+      return res.status(403).json({ error: 'Security Key mismatch. Access denied.' });
+    }
+
+    // 2. Credential Verification
+    const user = await User.findOne({ username });
+    if (!user || !(await bcrypt.compare(password, user.hash))) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    // 3. Success
+    res.json({ token: jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' }), username });
+  } catch (err) {
+    res.status(500).json({ error: 'Login process error' });
+  }
 });
 
 const io = new Server(server);
