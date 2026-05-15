@@ -204,6 +204,19 @@
 
     socket.on('error', showError);
 
+    // ── Connection lifecycle ───────────────────────────────────────────────────
+    socket.on('connect_error', () => {
+      userDisplay.textContent = '⚠ Connection failed — retrying…';
+    });
+
+    socket.on('disconnect', () => {
+      userDisplay.textContent = '⚠ Disconnected — reconnecting…';
+    });
+
+    socket.on('reconnect', () => {
+      // Page will receive a fresh 'welcome' with username & history on reconnect
+    });
+
     // ── Send ───────────────────────────────────────────────────────────────────
     function sendMessage() {
       const msg = input.value.trim();

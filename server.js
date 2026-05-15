@@ -11,9 +11,11 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        connectSrc: ["'self'", 'ws:', 'wss:'],
+        scriptSrc:  ["'self'"],
+        styleSrc:   ["'self'", "'unsafe-inline'"],
+        // 'self' covers same-origin ws:// and wss:// — the bare ws:/wss: entries
+        // don't include the host, so the browser blocked the socket upgrade.
+        connectSrc: ["'self'"],
       },
     },
   })
@@ -22,33 +24,32 @@ app.use(
 app.use(express.static('public'));
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const MAX_MSG_LENGTH    = 500;   // characters per message
-const RATE_LIMIT_WINDOW = 5000;  // ms — sliding window
-const RATE_LIMIT_MAX    = 10;    // messages allowed per window
-const MAX_HISTORY       = 100;   // messages kept in memory
+const MAX_MSG_LENGTH    = 500;
+const RATE_LIMIT_WINDOW = 5000;  // ms
+const RATE_LIMIT_MAX    = 10;
+const MAX_HISTORY       = 100;
 
 // ── In-memory state ───────────────────────────────────────────────────────────
 let userCount = 1;
 const userMap    = new Map();  // socket.id → username
 const rateLimits = new Map();  // socket.id → { count, windowStart }
-const history    = [];         // circular message store (capped at MAX_HISTORY)
+const history    = [];
 
-// ── Socket.IO: CORS restricted to same origin ─────────────────────────────────
+// ── Socket.IO ─────────────────────────────────────────────────────────────────
 const io = new Server(server, {
-  cors: {
-    origin: false,  // no cross-origin WebSocket connections
-  },
+  cors: { origin: false },
+  // If the browser closes before the WS handshake finishes, the server
+  // holds the socket open for pingTimeout + pingInterval ms by default
+  // (~25 s total). Lowering these means stale sockets from rapid refreshes
+  // are cleaned up in ~8 s instead of ~25 s, preventing the "hang" where
+  // the new connection races against the old one's cleanup.
+  pingTimeout:  6000,   // ms to wait for a pong before closing (default 20000)
+  pingInterval: 4000,   // ms between pings                     (default  5000)
+  // Cap how long the initial HTTP upgrade handshake can take.
+  connectTimeout: 8000, // ms                                    (default 45000)
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-/**
- * Sanitise a raw message string:
- *  - Strip surrounding whitespace
- *  - Enforce max length
- *  - Remove control characters (except normal spaces / newlines)
- * Returns null if the result is empty or too long.
- */
 function sanitise(raw) {
   if (typeof raw !== 'string') return null;
   const trimmed = raw.trim().replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
@@ -56,26 +57,19 @@ function sanitise(raw) {
   return trimmed;
 }
 
-/**
- * Simple sliding-window rate limiter.
- * Returns true if the socket is within the allowed rate.
- */
 function checkRateLimit(socketId) {
   const now = Date.now();
   const record = rateLimits.get(socketId) || { count: 0, windowStart: now };
-
   if (now - record.windowStart > RATE_LIMIT_WINDOW) {
     record.count = 1;
     record.windowStart = now;
   } else {
     record.count += 1;
   }
-
   rateLimits.set(socketId, record);
   return record.count <= RATE_LIMIT_MAX;
 }
 
-/** Append a message to history, evicting the oldest if at capacity. */
 function pushHistory(entry) {
   if (history.length >= MAX_HISTORY) history.shift();
   history.push(entry);
@@ -87,36 +81,28 @@ io.on('connection', (socket) => {
   userCount++;
   userMap.set(socket.id, username);
 
-  // Send the new user their username and the recent message history
   socket.emit('welcome', { username, history });
-  console.log(`${username} connected`);
+  console.log(`${username} connected (${io.engine.clientsCount} online)`);
 
   socket.on('chat message', (raw) => {
-    // 1. Rate limit
     if (!checkRateLimit(socket.id)) {
       socket.emit('error', 'You are sending messages too fast. Please slow down.');
       return;
     }
-
-    // 2. Sanitise
     const msg = sanitise(raw);
     if (!msg) {
       socket.emit('error', `Message must be between 1 and ${MAX_MSG_LENGTH} characters.`);
       return;
     }
-
-    // 3. Build and store the entry
     const user  = userMap.get(socket.id) || 'Unknown';
     const entry = { user, msg, ts: Date.now() };
     pushHistory(entry);
-
-    // 4. Broadcast
     io.emit('chat message', entry);
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', (reason) => {
     const user = userMap.get(socket.id) || 'Unknown';
-    console.log(`${user} disconnected`);
+    console.log(`${user} disconnected: ${reason}`);
     userMap.delete(socket.id);
     rateLimits.delete(socket.id);
   });
@@ -124,6 +110,4 @@ io.on('connection', (socket) => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
