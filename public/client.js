@@ -1,4 +1,14 @@
 let authMode = 'login', keyB64 = null, socket = null, myUsername = null, fullHistory = [];
+let unreadCount = 0;
+const originalTitle = document.title;
+
+// --- Tab Focus Management ---
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    unreadCount = 0;
+    document.title = originalTitle;
+  }
+});
 
 const switchTab = (m) => {
   authMode = m;
@@ -20,7 +30,7 @@ const handleFile = (f) => {
 async function doAuth() {
   const username = document.getElementById('f-username').value;
   const password = document.getElementById('f-password').value;
-  if(!username || !password || !keyB64) return alert("Missing info");
+  if(!username || !password || (authMode === 'register' && !keyB64)) return alert("Fill all fields");
 
   try {
     const res = await fetch('/auth/'+authMode, {
@@ -31,25 +41,46 @@ async function doAuth() {
     if(!res.ok) throw new Error(data.error);
     sessionStorage.setItem('tc_token', data.token);
     enterChat(data.token, data.username);
-  } catch(e) { document.getElementById('auth-alert').innerText = e.message; document.getElementById('auth-alert').style.display='block'; }
+  } catch(e) { 
+    const el = document.getElementById('auth-alert');
+    el.innerText = e.message; el.style.display='block'; 
+  }
 }
 
-function enterChat(token, user) {
-  myUsername = user;
+function enterChat(token, userPlaceholder) {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('chat-screen').style.display = 'flex';
-  document.getElementById('user-badge').innerText = user;
 
   socket = io({ auth: { token } });
-  socket.on('welcome', ({ history }) => { 
+
+  socket.on('welcome', ({ username, history }) => { 
+    myUsername = username;
+    document.getElementById('user-badge').innerText = username;
     fullHistory = history; 
-    applyFilter(); 
+    applyFilter();
+    setTimeout(scrollToBottom, 100);
     socket.emit('get users');
   });
-  socket.on('chat message', (msg) => { fullHistory.push(msg); applyFilter(); });
+
+  socket.on('chat message', (msg) => { 
+    fullHistory.push(msg); 
+    applyFilter();
+    scrollToBottom();
+    if (document.hidden) {
+      unreadCount++;
+      document.title = `(${unreadCount}) New Messages!`;
+    }
+  });
+
+  socket.on('status change', () => socket.emit('get users'));
+  
   socket.on('user list', (list) => {
-    const container = document.getElementById('user-list');
-    container.innerHTML = list.map(u => `<div class="user-item">${u}</div>`).join('');
+    document.getElementById('user-list').innerHTML = list.map(u => `
+      <div class="user-item">
+        <span>${u.name}</span>
+        <div class="dot" style="background:${u.online ? 'var(--accent)' : '#444'}"></div>
+      </div>
+    `).join('');
   });
 }
 
@@ -58,22 +89,22 @@ function applyFilter() {
   const userQ = document.getElementById('s-user').value.toLowerCase();
   const sort = document.getElementById('s-sort').value;
 
-  let filtered = fullHistory.filter(m => 
-    m.msg.toLowerCase().includes(query) && m.user.toLowerCase().includes(userQ)
-  );
-  
+  let filtered = fullHistory.filter(m => m.msg.toLowerCase().includes(query) && m.user.toLowerCase().includes(userQ));
   if(sort === 'old') filtered.sort((a,b) => new Date(a.ts) - new Date(b.ts));
   else filtered.sort((a,b) => new Date(b.ts) - new Date(a.ts));
 
-  const container = document.getElementById('messages');
-  container.innerHTML = filtered.map(m => `
+  document.getElementById('messages').innerHTML = filtered.map(m => `
     <div class="msg ${m.user === myUsername ? 'own' : ''}">
       <span class="msg-meta">${m.user}</span>
       <span>${m.msg}</span>
       <span class="msg-time">${new Date(m.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
     </div>
   `).join('');
-  container.scrollTop = container.scrollHeight;
+}
+
+function scrollToBottom() {
+  const m = document.getElementById('messages');
+  m.scrollTop = m.scrollHeight;
 }
 
 function toggleSearch() { 
@@ -84,7 +115,7 @@ function toggleSearch() {
 function filterUsers() {
   const q = document.getElementById('user-search').value.toLowerCase();
   document.querySelectorAll('.user-item').forEach(i => {
-    i.style.display = i.innerText.toLowerCase().includes(q) ? 'block' : 'none';
+    i.style.display = i.innerText.toLowerCase().includes(q) ? 'flex' : 'none';
   });
 }
 
@@ -99,5 +130,5 @@ function doSignOut() { sessionStorage.clear(); location.reload(); }
 
 window.onload = () => {
   const t = sessionStorage.getItem('tc_token');
-  if(t) enterChat(t, 'User');
+  if(t) enterChat(t, "..."); 
 };

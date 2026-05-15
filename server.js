@@ -11,29 +11,28 @@ const rateLimit = require('express-rate-limit');
 const app    = express();
 const server = http.createServer(app);
 
+// ── Database & State ────────────────────────────────────────────────────────
 const MONGO_URI = process.env.DATABASE_URL;
-if (!MONGO_URI) {
-  console.error("FATAL: DATABASE_URL environment variable not set.");
-  process.exit(1);
-}
+const ACCESS_KEY = process.env.ACCESS_KEY;
+const JWT_SECRET = 'super-secret-key'; // For true prod, move this to env too
+const onlineUsers = new Set();
 
 mongoose.connect(MONGO_URI)
-  .then(() => console.log("Connected to Cloud MongoDB"))
-  .catch(err => console.error("Database connection error:", err));
+  .then(() => console.log("Connected to MongoDB"))
+  .catch(err => console.error("DB Error:", err));
 
-const userSchema = new mongoose.Schema({
+const User = mongoose.model('User', new mongoose.Schema({
   username: { type: String, unique: true, required: true },
   hash: { type: String, required: true }
-});
-const User = mongoose.model('User', userSchema);
+}));
 
-const msgSchema = new mongoose.Schema({
+const Message = mongoose.model('Message', new mongoose.Schema({
   user: String,
   msg: String,
   ts: { type: Date, default: Date.now }
-});
-const Message = mongoose.model('Message', msgSchema);
+}));
 
+// ── Middleware ──────────────────────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -49,48 +48,32 @@ app.use(helmet({
 app.use(express.json({ limit: '16kb' }));
 app.use(express.static('public'));
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
-  max: 20, 
-  message: { error: 'Too many attempts, please try again later.' }
-});
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SERVER_KEY_BYTES = Buffer.from(ACCESS_KEY || '', 'utf8');
-const JWT_SECRET = 'super-secret-key'; 
-
-function generateToken(username) {
-  return jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' });
-}
-
+// ── Auth Routes ─────────────────────────────────────────────────────────────
 app.post('/auth/register', authLimiter, async (req, res) => {
   const { username, password, keyFile } = req.body;
-  
   try {
     const provided = Buffer.from(keyFile, 'base64');
-    if (!crypto.timingSafeEqual(SERVER_KEY_BYTES, provided)) {
-      return res.status(403).json({ error: 'Invalid Key File' });
-    }
+    const SERVER_KEY_BYTES = Buffer.from(ACCESS_KEY || '', 'utf8');
+    if (!crypto.timingSafeEqual(SERVER_KEY_BYTES, provided)) return res.status(403).json({ error: 'Invalid Key' });
 
     const hash = await bcrypt.hash(password, 10);
-    const newUser = new User({ username, hash });
-    await newUser.save();
-    res.json({ token: generateToken(username), username });
+    await new User({ username, hash }).save();
+    res.json({ token: jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' }), username });
   } catch (err) {
-    if (err.code === 11000) return res.status(400).json({ error: 'User exists' });
-    res.status(500).json({ error: 'Registration failed' });
+    res.status(400).json({ error: err.code === 11000 ? 'User exists' : 'Error' });
   }
 });
 
 app.post('/auth/login', authLimiter, async (req, res) => {
-  const { username, password, keyFile } = req.body;
+  const { username, password } = req.body;
   const user = await User.findOne({ username });
-  if (!user || !(await bcrypt.compare(password, user.hash))) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-  res.json({ token: generateToken(username), username });
+  if (!user || !(await bcrypt.compare(password, user.hash))) return res.status(401).json({ error: 'Invalid creds' });
+  res.json({ token: jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' }), username });
 });
 
+// ── Socket.io ───────────────────────────────────────────────────────────────
 const io = new Server(server);
 
 io.use((socket, next) => {
@@ -102,21 +85,28 @@ io.use((socket, next) => {
 });
 
 io.on('connection', async (socket) => {
-  // Load initial history
+  const name = socket.username;
+  onlineUsers.add(name);
+  io.emit('status change');
+
   const history = await Message.find().sort({ ts: -1 }).limit(100);
-  socket.emit('welcome', { username: socket.username, history: history.reverse() });
+  socket.emit('welcome', { username: name, history: history.reverse() });
 
   socket.on('chat message', async (raw) => {
     const msg = raw.toString().trim().substring(0, 500);
     if (!msg) return;
-    const entry = new Message({ user: socket.username, msg });
-    await entry.save();
+    const entry = await new Message({ user: name, msg }).save();
     io.emit('chat message', entry);
   });
 
   socket.on('get users', async () => {
-    const allUsers = await User.find({}, 'username');
-    socket.emit('user list', allUsers.map(u => u.username));
+    const all = await User.find({}, 'username');
+    socket.emit('user list', all.map(u => ({ name: u.username, online: onlineUsers.has(u.username) })));
+  });
+
+  socket.on('disconnect', () => {
+    onlineUsers.delete(name);
+    io.emit('status change');
   });
 });
 

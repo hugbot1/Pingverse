@@ -17,7 +17,7 @@
     .tabs { display: flex; gap: 10px; margin-bottom: 1rem; border-bottom: 1px solid #333; }
     .tab { flex: 1; padding: 10px; cursor: pointer; background: none; border: none; color: var(--text-muted); font-weight: bold; }
     .tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
-    input, select { width: 100%; padding: 10px; margin-bottom: 10px; background: #2a3338; border: 1px solid #444; color: white; border-radius: 6px; }
+    input, select { width: 100%; padding: 10px; margin-bottom: 10px; background: #2a3338; border: 1px solid #444; color: white; border-radius: 6px; outline: none; }
     .btn { width: 100%; padding: 12px; background: var(--accent); border: none; color: white; font-weight: bold; border-radius: 6px; cursor: pointer; }
     .key-zone { border: 2px dashed #444; padding: 10px; text-align: center; border-radius: 6px; cursor: pointer; margin-bottom: 10px; font-size: 0.8rem; }
     .key-zone.ok { border-color: var(--accent); color: var(--accent); }
@@ -26,12 +26,14 @@
     .sidebar { width: 280px; background: var(--sidebar); display: flex; flex-direction: column; border-right: 1px solid #222; }
     .sidebar-header { padding: 15px; border-bottom: 1px solid #222; }
     .user-list { flex: 1; overflow-y: auto; }
-    .user-item { padding: 10px 20px; font-size: 0.9rem; border-bottom: 1px solid #1a1e21; }
+    .user-item { padding: 10px 20px; font-size: 0.9rem; border-bottom: 1px solid #1a1e21; display: flex; justify-content: space-between; align-items: center; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    
     .main-chat { flex: 1; display: flex; flex-direction: column; }
     .chat-header { padding: 15px 20px; background: var(--sidebar); display: flex; justify-content: space-between; border-bottom: 1px solid #222; }
     .search-panel { padding: 10px 20px; background: var(--surface); display: flex; gap: 10px; border-bottom: 1px solid #222; }
-    #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
-    .msg { padding: 10px; border-radius: 8px; max-width: 70%; background: var(--surface); align-self: flex-start; position: relative; }
+    #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
+    .msg { padding: 10px; border-radius: 8px; max-width: 75%; background: var(--surface); align-self: flex-start; }
     .msg.own { align-self: flex-end; background: var(--own-msg); }
     .msg-meta { font-size: 0.7rem; color: var(--accent); font-weight: bold; display: block; margin-bottom: 4px; }
     .msg-time { font-size: 0.6rem; color: var(--text-muted); float: right; margin-top: 5px; margin-left: 10px; }
@@ -43,10 +45,7 @@
 
 <div id="auth-screen">
   <div class="card">
-    <div class="tabs">
-      <button id="tab-login" class="tab active" onclick="switchTab('login')">LOGIN</button>
-      <button id="tab-register" class="tab" onclick="switchTab('register')">REGISTER</button>
-    </div>
+    <div class="tabs"><button id="tab-login" class="tab active" onclick="switchTab('login')">LOGIN</button><button id="tab-register" class="tab" onclick="switchTab('register')">REGISTER</button></div>
     <div id="auth-alert" class="alert"></div>
     <input id="f-username" type="text" placeholder="Username">
     <input id="f-password" type="password" placeholder="Password">
@@ -62,26 +61,22 @@
   <div class="sidebar">
     <div class="sidebar-header"><input id="user-search" placeholder="Search people..." oninput="filterUsers()"></div>
     <div id="user-list" class="user-list"></div>
-    <div style="padding:15px; border-top:1px solid #222; display:flex; justify-content:space-between">
-      <span id="user-badge" style="color:var(--accent)">...</span>
-      <button onclick="doSignOut()" style="background:none; border:none; color:var(--danger); cursor:pointer">Logout</button>
+    <div style="padding:15px; border-top:1px solid #222; display:flex; justify-content:space-between; align-items: center;">
+      <span id="user-badge" style="color:var(--accent); font-weight: bold;">...</span>
+      <button onclick="doSignOut()" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size: 0.8rem;">Logout</button>
     </div>
   </div>
   <div class="main-chat">
-    <div class="chat-header">
-      <span>chat</span>
-      <button onclick="toggleSearch()" style="background:none; border:1px solid var(--accent); color:var(--accent); padding:4px 8px; border-radius:4px; cursor:pointer">🔍 Search</button>
-    </div>
+    <div class="chat-header"><span>Global Chat</span><button onclick="toggleSearch()" style="background:none; border:1px solid var(--accent); color:var(--accent); padding:4px 8px; border-radius:4px; cursor:pointer">🔍 Search</button></div>
     <div id="search-panel" class="search-panel" style="display:none">
-      <input id="s-content" placeholder="Message content..." oninput="applyFilter()">
-      <input id="s-user" placeholder="User..." oninput="applyFilter()">
+      <input id="s-content" placeholder="Content..." oninput="applyFilter()"><input id="s-user" placeholder="User..." oninput="applyFilter()">
       <select id="s-sort" onchange="applyFilter()"><option value="new">Newest</option><option value="old">Oldest</option></select>
     </div>
     <div id="messages"></div>
-    <div class="input-area">
-      <input id="msg-input" placeholder="Type a message..." style="margin-bottom:0">
-      <button class="btn" onclick="doSend()" style="width:80px">Send</button>
-    </div>
+    <form class="input-area" onsubmit="event.preventDefault(); doSend();">
+      <input id="msg-input" placeholder="Type a message..." autocomplete="off" style="margin-bottom:0">
+      <button class="btn" type="submit" style="width:80px">Send</button>
+    </form>
   </div>
 </div>
 
