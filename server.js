@@ -21,7 +21,6 @@ mongoose.connect(MONGO_URI)
   .then(() => console.log("Connected to MongoDB"))
   .catch(err => console.error("DB Error:", err));
 
-// UPDATED: User Schema with mutedUntil for timeouts
 const User = mongoose.model('User', new mongoose.Schema({
   username: { type: String, unique: true, required: true },
   hash: { type: String, required: true },
@@ -29,7 +28,6 @@ const User = mongoose.model('User', new mongoose.Schema({
   mutedUntil: { type: Date, default: null } 
 }));
 
-// UPDATED: Message Schema with 'to' for PMs and 'replyTo' for replies
 const Message = mongoose.model('Message', new mongoose.Schema({
   user: String,
   msg: String,
@@ -115,7 +113,6 @@ io.on('connection', async (socket) => {
   const lastBC = await Announcement.findOne().sort({ ts: -1 });
   socket.emit('announcement', lastBC || { msg: '', important: false });
 
-  // Fetch only global messages or PMs involving this user
   const history = await Message.find({
     $or: [{ to: 'global' }, { to: name }, { user: name }]
   }).sort({ ts: -1 }).limit(150);
@@ -123,7 +120,6 @@ io.on('connection', async (socket) => {
   socket.emit('welcome', { username: name, role: role, history: history.reverse() });
 
   socket.on('chat message', async (data) => {
-    // Check for mute
     const user = await User.findOne({ username: name });
     if (user.mutedUntil && user.mutedUntil > new Date()) {
       return socket.emit('error notice', `You are muted until ${user.mutedUntil.toLocaleTimeString()}`);
@@ -144,14 +140,12 @@ io.on('connection', async (socket) => {
     if (entry.to === 'global') {
       io.emit('chat message', entry);
     } else {
-      // Direct message routing
       socket.emit('chat message', entry);
       const targetSocket = Array.from(io.sockets.sockets.values()).find(s => s.user.username === entry.to);
       if (targetSocket) targetSocket.emit('chat message', entry);
     }
   });
 
-  // FEATURE: Edit Message
   socket.on('edit message', async ({ id, newMsg }) => {
     const msg = await Message.findById(id);
     if (msg && msg.user === name) {
@@ -162,7 +156,6 @@ io.on('connection', async (socket) => {
     }
   });
 
-  // FEATURE: Timeout/Mute (Admins only)
   socket.on('timeout user', async ({ target, mins }) => {
     if (role !== 'admin') return;
     const until = new Date(Date.now() + mins * 60000);
@@ -170,7 +163,6 @@ io.on('connection', async (socket) => {
     io.emit('user status alert', { target, muted: true, until });
   });
 
-  // FEATURE: Account Management (Self or Admin)
   socket.on('update account', async (data) => {
     const updates = {};
     if (data.username && data.username !== name) {
