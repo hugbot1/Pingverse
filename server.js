@@ -10,11 +10,14 @@ const app    = express();
 const server = http.createServer(app);
 
 // ── Security headers ───────────────────────────────────────────────────────────
+// ── Security headers ───────────────────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc:  ["'self'", "'unsafe-inline'"],
+      // Add scriptSrcAttr to allow onclick handlers
+      scriptSrcAttr: ["'unsafe-inline'"], 
       styleSrc:   ["'self'", "'unsafe-inline'"],
       connectSrc: ["'self'"],
     },
