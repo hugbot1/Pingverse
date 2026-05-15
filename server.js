@@ -11,10 +11,9 @@ const rateLimit = require('express-rate-limit');
 const app    = express();
 const server = http.createServer(app);
 
-// ── Database & State ────────────────────────────────────────────────────────
 const MONGO_URI = process.env.DATABASE_URL;
 const ACCESS_KEY = process.env.ACCESS_KEY;
-const JWT_SECRET = 'super-secret-key'; // For true prod, move this to env too
+const JWT_SECRET = process.env.JWT_SECRET;
 const onlineUsers = new Set();
 
 mongoose.connect(MONGO_URI)
@@ -32,7 +31,6 @@ const Message = mongoose.model('Message', new mongoose.Schema({
   ts: { type: Date, default: Date.now }
 }));
 
-// ── Middleware ──────────────────────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -50,7 +48,6 @@ app.use(express.static('public'));
 
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 
-// ── Auth Routes ─────────────────────────────────────────────────────────────
 app.post('/auth/register', authLimiter, async (req, res) => {
   const { username, password, keyFile } = req.body;
   try {
@@ -73,7 +70,6 @@ app.post('/auth/login', authLimiter, async (req, res) => {
   res.json({ token: jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' }), username });
 });
 
-// ── Socket.io ───────────────────────────────────────────────────────────────
 const io = new Server(server);
 
 io.use((socket, next) => {

@@ -1,8 +1,7 @@
 let authMode = 'login', keyB64 = null, socket = null, myUsername = null, fullHistory = [];
 let unreadCount = 0;
-const originalTitle = document.title;
+const originalTitle = "TechChat";
 
-// --- Tab Focus Management ---
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
     unreadCount = 0;
@@ -58,14 +57,15 @@ function enterChat(token, userPlaceholder) {
     document.getElementById('user-badge').innerText = username;
     fullHistory = history; 
     applyFilter();
-    setTimeout(scrollToBottom, 100);
+    scrollToBottomInstant();
     socket.emit('get users');
   });
 
   socket.on('chat message', (msg) => { 
     fullHistory.push(msg); 
     applyFilter();
-    scrollToBottom();
+    scrollToBottomInstant();
+    
     if (document.hidden) {
       unreadCount++;
       document.title = `(${unreadCount}) New Messages!`;
@@ -89,24 +89,17 @@ function applyFilter() {
   const userQ = document.getElementById('s-user').value.toLowerCase();
   const sort = document.getElementById('s-sort').value;
 
-  // 1. Filter the history based on search inputs
   let filtered = fullHistory.filter(m => 
     m.msg.toLowerCase().includes(query) && 
     m.user.toLowerCase().includes(userQ)
   );
 
-  // 2. Sort Logic: 
-  // For a standard chat, "Newest" means the message with the latest timestamp 
-  // should be at the BOTTOM of the list.
-  if (sort === 'new') {
-    // Ascending: Oldest (top) to Newest (bottom)
-    filtered.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+  if(sort === 'new') {
+    filtered.sort((a,b) => new Date(a.ts) - new Date(b.ts));
   } else {
-    // Descending: Newest (top) to Oldest (bottom) - strictly for "Search" mode
-    filtered.sort((a, b) => new Date(b.ts) - new Date(a.ts));
+    filtered.sort((a,b) => new Date(b.ts) - new Date(a.ts));
   }
 
-  // 3. Render to DOM
   document.getElementById('messages').innerHTML = filtered.map(m => `
     <div class="msg ${m.user === myUsername ? 'own' : ''}">
       <span class="msg-meta">${m.user}</span>
@@ -114,14 +107,13 @@ function applyFilter() {
       <span class="msg-time">${new Date(m.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
     </div>
   `).join('');
-
-  // 4. Always scroll to the bottom so the fresh message is visible
-  scrollToBottom();
 }
 
-function scrollToBottom() {
+function scrollToBottomInstant() {
   const m = document.getElementById('messages');
-  m.scrollTop = m.scrollHeight;
+  requestAnimationFrame(() => {
+    m.scrollTop = m.scrollHeight;
+  });
 }
 
 function toggleSearch() { 
@@ -147,5 +139,5 @@ function doSignOut() { sessionStorage.clear(); location.reload(); }
 
 window.onload = () => {
   const t = sessionStorage.getItem('tc_token');
-  if(t) enterChat(t, "..."); 
+  if(t) enterChat(t, "...");
 };
