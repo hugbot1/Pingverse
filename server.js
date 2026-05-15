@@ -13,7 +13,7 @@ const server = http.createServer(app);
 
 const MONGO_URI = process.env.DATABASE_URL;
 const EXPECTED_KEY = process.env.ACCESS_KEY;
-const ADMIN_KEY = process.env.ADMIN_KEY; // New Admin Key
+const ADMIN_KEY = process.env.ADMIN_KEY;
 const JWT_SECRET = process.env.JWT_SECRET;
 const onlineUsers = new Set();
 let globalAnnouncement = { msg: '', important: false };
@@ -50,7 +50,6 @@ app.use(express.static('public'));
 
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 
-// Helper to check which key was used
 function getRoleFromKey(providedB64) {
   if (!providedB64) return null;
   const key = Buffer.from(providedB64, 'base64').toString('utf8').trim();
@@ -91,7 +90,7 @@ const io = new Server(server);
 io.use((socket, next) => {
   try {
     const payload = jwt.verify(socket.handshake.auth?.token, JWT_SECRET);
-    socket.user = payload; // Contains username and role
+    socket.user = payload;
     next();
   } catch { next(new Error('Unauthorised')); }
 });

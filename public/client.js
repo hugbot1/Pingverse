@@ -63,7 +63,7 @@ function enterChat(token) {
   socket.on('welcome', ({ username, role, history }) => { 
     myUsername = username;
     myRole = role;
-    document.getElementById('user-badge').innerText = username + (role==='admin' ? ' 👑' : '');
+    document.getElementById('user-badge').innerText = username + (role==='admin' ? ' (Owner)' : '');
     if(role === 'admin') document.getElementById('admin-tools').style.display = 'block';
     fullHistory = history; 
     applyFilter();
