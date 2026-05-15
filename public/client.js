@@ -170,6 +170,7 @@ function exitPrivate() {
   document.getElementById('chat-title').innerText = "Global Chat";
   document.getElementById('back-btn').style.display = 'none';
   applyFilter();
+  scrollToBottomInstant();
 }
 
 function applyFilter() {
