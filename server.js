@@ -11,7 +11,6 @@ const rateLimit = require('express-rate-limit');
 const app    = express();
 const server = http.createServer(app);
 
-// ── Database Connection ──────────────────────────────────────────────────────
 const MONGO_URI = process.env.DATABASE_URL;
 if (!MONGO_URI) {
   console.error("FATAL: DATABASE_URL environment variable not set.");
@@ -35,7 +34,6 @@ const msgSchema = new mongoose.Schema({
 });
 const Message = mongoose.model('Message', msgSchema);
 
-// ── Security & Middleware ─────────────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -65,7 +63,6 @@ function generateToken(username) {
   return jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' });
 }
 
-// ── Auth Routes ───────────────────────────────────────────────────────────────
 app.post('/auth/register', authLimiter, async (req, res) => {
   const { username, password, keyFile } = req.body;
   
@@ -94,7 +91,6 @@ app.post('/auth/login', authLimiter, async (req, res) => {
   res.json({ token: generateToken(username), username });
 });
 
-// ── Socket.io ────────────────────────────────────────────────────────────────
 const io = new Server(server);
 
 io.use((socket, next) => {
@@ -110,7 +106,6 @@ io.on('connection', async (socket) => {
   const history = await Message.find().sort({ ts: -1 }).limit(100);
   socket.emit('welcome', { username: socket.username, history: history.reverse() });
 
-  // Handle new messages
   socket.on('chat message', async (raw) => {
     const msg = raw.toString().trim().substring(0, 500);
     if (!msg) return;
@@ -119,7 +114,6 @@ io.on('connection', async (socket) => {
     io.emit('chat message', entry);
   });
 
-  // Provide user list for search
   socket.on('get users', async () => {
     const allUsers = await User.find({}, 'username');
     socket.emit('user list', allUsers.map(u => u.username));
