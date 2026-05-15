@@ -98,10 +98,12 @@ function enterChat(token) {
   });
 
   socket.on('status change', () => socket.emit('get users'));
+  
+  // PATCHED: User list now shows (Owner)
   socket.on('user list', (list) => {
     document.getElementById('user-list').innerHTML = list.map(u => `
       <div class="user-item">
-        <span>${u.name}</span>
+        <span>${u.name}${u.role === 'admin' ? ' <small style="color:var(--accent); font-weight:bold;">(Owner)</small>' : ''}</span>
         <div class="dot" style="background:${u.online ? 'var(--accent)' : '#444'}"></div>
       </div>
     `).join('');
@@ -116,9 +118,13 @@ function applyFilter() {
   if(sort === 'new') filtered.sort((a,b) => new Date(a.ts) - new Date(b.ts));
   else filtered.sort((a,b) => new Date(b.ts) - new Date(a.ts));
 
+  // PATCHED: Messages now show (Owner)
   document.getElementById('messages').innerHTML = filtered.map(m => `
     <div class="msg ${m.user === myUsername ? 'own' : ''}">
-      <span class="msg-meta">${m.user} ${myRole === 'admin' ? `<button onclick="deleteMsg('${m._id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;margin-left:8px;">[X]</button>` : ''}</span>
+      <span class="msg-meta">
+        ${m.user}${m.role === 'admin' ? ' (Owner)' : ''} 
+        ${myRole === 'admin' ? `<button onclick="deleteMsg('${m._id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;margin-left:8px;">[X]</button>` : ''}
+      </span>
       <span>${m.msg}</span>
       <span class="msg-time">${new Date(m.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
     </div>

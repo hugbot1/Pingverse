@@ -16,20 +16,29 @@ const EXPECTED_KEY = process.env.ACCESS_KEY;
 const ADMIN_KEY = process.env.ADMIN_KEY;
 const JWT_SECRET = process.env.JWT_SECRET;
 const onlineUsers = new Set();
-let globalAnnouncement = { msg: '', important: false };
 
 mongoose.connect(MONGO_URI)
   .then(() => console.log("Connected to MongoDB"))
   .catch(err => console.error("DB Error:", err));
 
+// Added 'role' to User Schema
 const User = mongoose.model('User', new mongoose.Schema({
   username: { type: String, unique: true, required: true },
-  hash: { type: String, required: true }
+  hash: { type: String, required: true },
+  role: { type: String, default: 'user' }
 }));
 
+// Added 'role' to Message Schema for persistence
 const Message = mongoose.model('Message', new mongoose.Schema({
   user: String,
   msg: String,
+  role: String, 
+  ts: { type: Date, default: Date.now }
+}));
+
+const Announcement = mongoose.model('Announcement', new mongoose.Schema({
+  msg: String,
+  important: Boolean,
   ts: { type: Date, default: Date.now }
 }));
 
@@ -65,7 +74,8 @@ app.post('/auth/register', authLimiter, async (req, res) => {
 
   try {
     const hash = await bcrypt.hash(password, 10);
-    await new User({ username, hash }).save();
+    // Save role to user document
+    await new User({ username, hash, role }).save();
     res.json({ token: jwt.sign({ username, role }, JWT_SECRET, { expiresIn: '24h' }), username, role });
   } catch (err) {
     if (err.code === 11000) return res.status(400).json({ error: 'Username taken' });
@@ -82,6 +92,7 @@ app.post('/auth/login', authLimiter, async (req, res) => {
   if (!user || !(await bcrypt.compare(password, user.hash))) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
+  // Ensure token always has current role
   res.json({ token: jwt.sign({ username, role }, JWT_SECRET, { expiresIn: '24h' }), username, role });
 });
 
@@ -97,24 +108,30 @@ io.use((socket, next) => {
 
 io.on('connection', async (socket) => {
   const name = socket.user.username;
+  const role = socket.user.role;
   onlineUsers.add(name);
   io.emit('status change');
 
-  socket.emit('announcement', globalAnnouncement);
+  const lastBC = await Announcement.findOne().sort({ ts: -1 });
+  socket.emit('announcement', lastBC || { msg: '', important: false });
+
   const history = await Message.find().sort({ ts: -1 }).limit(100);
-  socket.emit('welcome', { username: name, role: socket.user.role, history: history.reverse() });
+  socket.emit('welcome', { username: name, role: role, history: history.reverse() });
 
   socket.on('chat message', async (raw) => {
     const msg = raw.toString().trim().substring(0, 500);
     if (!msg) return;
-    const entry = await new Message({ user: name, msg }).save();
+    // Save message with the sender's role
+    const entry = await new Message({ user: name, msg, role: role }).save();
     io.emit('chat message', entry);
   });
 
-  socket.on('set announcement', (data) => {
+  socket.on('set announcement', async (data) => {
     if (socket.user.role !== 'admin') return;
-    globalAnnouncement = { msg: data.msg, important: data.important };
-    io.emit('announcement', globalAnnouncement);
+    await Announcement.deleteMany({});
+    const newBC = new Announcement({ msg: data.msg, important: data.important });
+    await newBC.save();
+    io.emit('announcement', newBC);
   });
 
   socket.on('delete message', async (id) => {
@@ -124,8 +141,13 @@ io.on('connection', async (socket) => {
   });
 
   socket.on('get users', async () => {
-    const all = await User.find({}, 'username');
-    socket.emit('user list', all.map(u => ({ name: u.username, online: onlineUsers.has(u.username) })));
+    // Fetch both username AND role for the list
+    const all = await User.find({}, 'username role');
+    socket.emit('user list', all.map(u => ({ 
+      name: u.username, 
+      role: u.role, 
+      online: onlineUsers.has(u.username) 
+    })));
   });
 
   socket.on('disconnect', () => {
