@@ -21,16 +21,22 @@ mongoose.connect(MONGO_URI)
   .then(() => console.log("Connected to MongoDB"))
   .catch(err => console.error("DB Error:", err));
 
+// UPDATED: User Schema with mutedUntil for timeouts
 const User = mongoose.model('User', new mongoose.Schema({
   username: { type: String, unique: true, required: true },
   hash: { type: String, required: true },
-  role: { type: String, default: 'user' }
+  role: { type: String, default: 'user' },
+  mutedUntil: { type: Date, default: null } 
 }));
 
+// UPDATED: Message Schema with 'to' for PMs and 'replyTo' for replies
 const Message = mongoose.model('Message', new mongoose.Schema({
   user: String,
   msg: String,
-  role: String, 
+  role: String,
+  to: { type: String, default: 'global' },
+  replyTo: { type: Object, default: null },
+  edited: { type: Boolean, default: false },
   ts: { type: Date, default: Date.now }
 }));
 
@@ -69,7 +75,6 @@ app.post('/auth/register', authLimiter, async (req, res) => {
   const { username, password, keyFile } = req.body;
   const role = getRoleFromKey(keyFile);
   if (!role) return res.status(403).json({ error: 'Invalid Key File' });
-
   try {
     const hash = await bcrypt.hash(password, 10);
     await new User({ username, hash, role }).save();
@@ -84,7 +89,6 @@ app.post('/auth/login', authLimiter, async (req, res) => {
   const { username, password, keyFile } = req.body;
   const role = getRoleFromKey(keyFile);
   if (!role) return res.status(403).json({ error: 'Invalid Key File' });
-
   const user = await User.findOne({ username });
   if (!user || !(await bcrypt.compare(password, user.hash))) {
     return res.status(401).json({ error: 'Invalid credentials' });
@@ -111,18 +115,87 @@ io.on('connection', async (socket) => {
   const lastBC = await Announcement.findOne().sort({ ts: -1 });
   socket.emit('announcement', lastBC || { msg: '', important: false });
 
-  const history = await Message.find().sort({ ts: -1 }).limit(100);
+  // Fetch only global messages or PMs involving this user
+  const history = await Message.find({
+    $or: [{ to: 'global' }, { to: name }, { user: name }]
+  }).sort({ ts: -1 }).limit(150);
+  
   socket.emit('welcome', { username: name, role: role, history: history.reverse() });
 
-  socket.on('chat message', async (raw) => {
-    const msg = raw.toString().trim().substring(0, 500);
-    if (!msg) return;
-    const entry = await new Message({ user: name, msg, role: role }).save();
-    io.emit('chat message', entry);
+  socket.on('chat message', async (data) => {
+    // Check for mute
+    const user = await User.findOne({ username: name });
+    if (user.mutedUntil && user.mutedUntil > new Date()) {
+      return socket.emit('error notice', `You are muted until ${user.mutedUntil.toLocaleTimeString()}`);
+    }
+
+    const msgContent = typeof data === 'string' ? data : data.msg;
+    const cleanMsg = msgContent.trim().substring(0, 500);
+    if (!cleanMsg) return;
+
+    const entry = await new Message({ 
+      user: name, 
+      msg: cleanMsg, 
+      role: role,
+      to: data.to || 'global',
+      replyTo: data.replyTo || null
+    }).save();
+
+    if (entry.to === 'global') {
+      io.emit('chat message', entry);
+    } else {
+      // Direct message routing
+      socket.emit('chat message', entry);
+      const targetSocket = Array.from(io.sockets.sockets.values()).find(s => s.user.username === entry.to);
+      if (targetSocket) targetSocket.emit('chat message', entry);
+    }
+  });
+
+  // FEATURE: Edit Message
+  socket.on('edit message', async ({ id, newMsg }) => {
+    const msg = await Message.findById(id);
+    if (msg && msg.user === name) {
+      msg.msg = newMsg.substring(0, 500);
+      msg.edited = true;
+      await msg.save();
+      io.emit('msg updated', msg);
+    }
+  });
+
+  // FEATURE: Timeout/Mute (Admins only)
+  socket.on('timeout user', async ({ target, mins }) => {
+    if (role !== 'admin') return;
+    const until = new Date(Date.now() + mins * 60000);
+    await User.findOneAndUpdate({ username: target }, { mutedUntil: until });
+    io.emit('user status alert', { target, muted: true, until });
+  });
+
+  // FEATURE: Account Management (Self or Admin)
+  socket.on('update account', async (data) => {
+    const updates = {};
+    if (data.username && data.username !== name) {
+      const exists = await User.findOne({ username: data.username });
+      if (exists) return socket.emit('settings error', 'Username taken');
+      updates.username = data.username;
+    }
+    if (data.password) updates.hash = await bcrypt.hash(data.password, 10);
+    
+    await User.findOneAndUpdate({ username: name }, updates);
+    if (updates.username) await Message.updateMany({ user: name }, { user: updates.username });
+    socket.emit('settings success', 'Updated. Re-logging...');
+  });
+
+  socket.on('delete account', async (target) => {
+    const targetUser = target || name;
+    if (targetUser !== name && role !== 'admin') return;
+    await Message.deleteMany({ user: targetUser });
+    await User.deleteOne({ username: targetUser });
+    if (targetUser === name) socket.emit('force logout');
+    io.emit('status change');
   });
 
   socket.on('set announcement', async (data) => {
-    if (socket.user.role !== 'admin') return;
+    if (role !== 'admin') return;
     await Announcement.deleteMany({});
     const newBC = new Announcement({ msg: data.msg, important: data.important });
     await newBC.save();
@@ -130,17 +203,20 @@ io.on('connection', async (socket) => {
   });
 
   socket.on('delete message', async (id) => {
-    if (socket.user.role !== 'admin') return;
-    await Message.findByIdAndDelete(id);
-    io.emit('msg deleted', id);
+    const msg = await Message.findById(id);
+    if (role === 'admin' || (msg && msg.user === name)) {
+      await Message.findByIdAndDelete(id);
+      io.emit('msg deleted', id);
+    }
   });
 
   socket.on('get users', async () => {
-    const all = await User.find({}, 'username role');
+    const all = await User.find({}, 'username role mutedUntil');
     socket.emit('user list', all.map(u => ({ 
       name: u.username, 
       role: u.role, 
-      online: onlineUsers.has(u.username) 
+      online: onlineUsers.has(u.username),
+      isMuted: u.mutedUntil && u.mutedUntil > new Date()
     })));
   });
 

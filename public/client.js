@@ -2,6 +2,10 @@ let authMode = 'login', keyB64 = null, socket = null, myUsername = null, fullHis
 let unreadCount = 0;
 const originalTitle = "TechChat";
 
+// State extensions for new features
+let activePrivateUser = null; 
+let replyContext = null;      
+
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
     unreadCount = 0;
@@ -97,39 +101,195 @@ function enterChat(token) {
     applyFilter();
   });
 
-  socket.on('status change', () => socket.emit('get users'));
-  
-  socket.on('user list', (list) => {
-    document.getElementById('user-list').innerHTML = list.map(u => `
-      <div class="user-item">
-        <span>${u.name}${u.role === 'admin' ? ' <small style="color:var(--accent); font-weight:bold;">(Owner)</small>' : ''}</span>
-        <div class="dot" style="background:${u.online ? 'var(--accent)' : '#444'}"></div>
-      </div>
-    `).join('');
+  // Feature 1: Real-time update on live text editing
+  socket.on('msg updated', (updatedMsg) => {
+    fullHistory = fullHistory.map(m => m._id === updatedMsg._id ? updatedMsg : m);
+    applyFilter();
   });
+
+  socket.on('error notice', (errorMsg) => {
+    alert(errorMsg);
+  });
+
+  socket.on('user status alert', ({ target, muted, until }) => {
+    if(target === myUsername && muted) {
+      alert(`You have been muted until: ${new Date(until).toLocaleTimeString()}`);
+    }
+    socket.emit('get users');
+  });
+
+  socket.on('status change', () => socket.emit('get users'));
+  socket.on('user list update', () => socket.emit('get users'));
+  socket.on('force logout', () => doSignOut());
+
+  // Settings handling responses
+  socket.on('settings success', (msg) => { alert(msg); doSignOut(); });
+  socket.on('settings error', (msg) => {
+    const el = document.getElementById('settings-alert');
+    el.innerText = msg; el.style.display = 'block';
+  });
+  
+  // Feature 2 & 3: Interactive elements linked onto sidebar entries
+  socket.on('user list', (list) => {
+    document.getElementById('user-list').innerHTML = list.map(u => {
+      const muteLabel = u.isMuted ? ' <span style="color:var(--danger)">[Muted]</span>' : '';
+      const ownerLabel = u.role === 'admin' ? ' <small style="color:var(--accent); font-weight:bold;">(Owner)</small>' : '';
+      
+      // Admin tools payload on right click / secondary buttons
+      const adminActions = (myRole === 'admin' && u.name !== myUsername) ? `
+        <div style="margin-top:4px; display:flex; gap:5px;">
+          <button onclick="event.stopPropagation(); timeoutUser('${u.name}')" style="background:#333; font-size:10px; color:#fff; border:none; padding:2px 4px; border-radius:3px;">Timeout</button>
+          <button onclick="event.stopPropagation(); terminateAccount('${u.name}')" style="background:var(--danger); font-size:10px; color:#fff; border:none; padding:2px 4px; border-radius:3px;">Ban</button>
+        </div>
+      ` : '';
+
+      return `
+        <div class="user-item" onclick="startPrivate('${u.name}')">
+          <div>
+            <span style="font-weight:500;">${u.name}</span>${ownerLabel}${muteLabel}
+            ${adminActions}
+          </div>
+          <div class="dot" style="background:${u.online ? 'var(--accent)' : '#444'}"></div>
+        </div>
+      `;
+    }).join('');
+  });
+}
+
+// Feature 3: Private Channel Navigation
+function startPrivate(target) {
+  if (target === myUsername) return;
+  activePrivateUser = target;
+  document.getElementById('chat-title').innerText = `Chat with ${target}`;
+  document.getElementById('back-btn').style.display = 'inline-block';
+  applyFilter();
+}
+
+function exitPrivate() {
+  activePrivateUser = null;
+  document.getElementById('chat-title').innerText = "Global Chat";
+  document.getElementById('back-btn').style.display = 'none';
+  applyFilter();
 }
 
 function applyFilter() {
   const query = document.getElementById('s-content').value.toLowerCase();
   const userQ = document.getElementById('s-user').value.toLowerCase();
   const sort = document.getElementById('s-sort').value;
-  let filtered = fullHistory.filter(m => m.msg.toLowerCase().includes(query) && m.user.toLowerCase().includes(userQ));
+
+  // Filter messages based on active context channel (Global vs Direct Message)
+  let filtered = fullHistory.filter(m => {
+    const isGlobalView = !activePrivateUser && (!m.to || m.to === 'global');
+    const isPrivateView = activePrivateUser && (
+      (m.user === myUsername && m.to === activePrivateUser) ||
+      (m.user === activePrivateUser && m.to === myUsername)
+    );
+    return isGlobalView || isPrivateView;
+  });
+
+  // Filter based on search criteria
+  filtered = filtered.filter(m => m.msg.toLowerCase().includes(query) && m.user.toLowerCase().includes(userQ));
+  
   if(sort === 'new') filtered.sort((a,b) => new Date(a.ts) - new Date(b.ts));
   else filtered.sort((a,b) => new Date(b.ts) - new Date(a.ts));
 
-  document.getElementById('messages').innerHTML = filtered.map(m => `
-    <div class="msg ${m.user === myUsername ? 'own' : ''}">
-      <span class="msg-meta">
-        ${m.user}${m.role === 'admin' ? ' (Owner)' : ''} 
-        ${myRole === 'admin' ? `<button onclick="deleteMsg('${m._id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;margin-left:8px;">[X]</button>` : ''}
-      </span>
-      <span>${m.msg}</span>
-      <span class="msg-time">${new Date(m.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-    </div>
-  `).join('');
+  document.getElementById('messages').innerHTML = filtered.map(m => {
+    const isOwn = m.user === myUsername;
+    
+    // Action buttons depending on credentials (Feature 1: Self edit/delete)
+    const canDelete = myRole === 'admin' || isOwn;
+    const canEdit = isOwn;
+
+    const actionButtons = `
+      <div style="display:inline-block; margin-left:8px;">
+        ${canEdit ? `<button onclick="editMsg('${m._id}', '${escapeHtml(m.msg)}')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:0.7rem;margin-right:4px;">[Edit]</button>` : ''}
+        ${canDelete ? `<button onclick="deleteMsg('${m._id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.7rem;">[X]</button>` : ''}
+        <button onclick="setReply('${m._id}', '${m.user}', '${escapeHtml(m.msg)}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.7rem;margin-left:4px;">[Reply]</button>
+      </div>
+    `;
+
+    // Render Reply Anchor metadata block (Feature 7)
+    const replyContextMark = m.replyTo ? `
+      <div class="reply-box" onclick="scrollToMessage('${m.replyTo.id}')">
+        <strong>@${m.replyTo.user}</strong>: ${m.replyTo.text}...
+      </div>
+    ` : '';
+
+    return `
+      <div class="msg ${isOwn ? 'own' : ''}" id="msg-${m._id}">
+        <span class="msg-meta">
+          <span>${m.user}${m.role === 'admin' ? ' (Owner)' : ''}${m.edited ? ' <small style="font-style:italic;opacity:0.6;">(edited)</small>' : ''}</span>
+          ${actionButtons}
+        </span>
+        ${replyContextMark}
+        <span class="msg-content">${escapeHtml(m.msg)}</span>
+        <div class="msg-time">${new Date(m.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
+      </div>
+    `;
+  }).join('');
 }
 
-function deleteMsg(id) { socket.emit('delete message', id); }
+function deleteMsg(id) { if(confirm("Delete this message?")) socket.emit('delete message', id); }
+
+// Feature 1: Edit Trigger Handling
+function editMsg(id, oldText) {
+  const newMsg = prompt("Edit your message:", oldText);
+  if (newMsg !== null && newMsg.trim() !== "") {
+    socket.emit('edit message', { id, newMsg: newMsg.trim() });
+  }
+}
+
+// Feature 7: Reply Context Bindings
+function setReply(id, user, text) {
+  replyContext = { id, user, text: text.substring(0, 45) };
+  document.getElementById('reply-text').innerText = `Replying to @${user}: "${replyContext.text}..."`;
+  document.getElementById('reply-preview').style.display = 'flex';
+  document.getElementById('msg-input').focus();
+}
+
+function cancelReply() {
+  replyContext = null;
+  document.getElementById('reply-preview').style.display = 'none';
+}
+
+function scrollToMessage(id) {
+  const el = document.getElementById(`msg-${id}`);
+  if(el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// Feature 2: Admin Timeout Prompt
+function timeoutUser(username) {
+  const mins = prompt(`Timeout ${username} for how many minutes?`, "10");
+  if (mins) socket.emit('timeout user', { target: username, mins: parseInt(mins, 10) });
+}
+
+// Feature 6: Admin Ban Account
+function terminateAccount(username) {
+  if (confirm(`Permanently delete account "${username}" and all their messages? This cannot be undone.`)) {
+    socket.emit('delete account', username);
+  }
+}
+
+// Feature 5: Personal Settings Screen Toggles
+function openSettings() { 
+  document.getElementById('settings-alert').style.display = 'none';
+  document.getElementById('settings-modal').style.display = 'flex'; 
+}
+function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+
+function saveSettings() {
+  const newUser = document.getElementById('new-username').value.trim();
+  const newPass = document.getElementById('new-password').value.trim();
+  if (!newUser && !newPass) return;
+  socket.emit('update account', { username: newUser || null, password: newPass || null });
+}
+
+function deleteAccount() {
+  if (confirm("Are you absolutely sure you want to completely erase your account and clean all your data? This action is fatal.")) {
+    socket.emit('delete account', null);
+  }
+}
+
 function updateBroadcast() {
   const msg = document.getElementById('bc-input').value;
   const important = document.getElementById('bc-check').checked;
@@ -156,8 +316,21 @@ function filterUsers() {
 function doSend() {
   const i = document.getElementById('msg-input');
   if(!i.value.trim()) return;
-  socket.emit('chat message', i.value);
+
+  // Build specialized transaction package depending on UI view and filters
+  const data = {
+    msg: i.value,
+    to: activePrivateUser || 'global',
+    replyTo: replyContext
+  };
+
+  socket.emit('chat message', data);
   i.value = '';
+  cancelReply();
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
 function doSignOut() { sessionStorage.clear(); location.reload(); }
