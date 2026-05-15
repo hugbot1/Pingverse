@@ -20,7 +20,6 @@ const handleFile = (f) => {
   if (!f[0]) return;
   const r = new FileReader();
   r.onload = e => { 
-    // IMPORTANT: Remove the "data:text/plain;base64," header
     const parts = e.target.result.split(',');
     if (parts.length > 1) {
       keyB64 = parts[1];
@@ -35,7 +34,6 @@ async function doAuth() {
   const username = document.getElementById('f-username').value;
   const password = document.getElementById('f-password').value;
   
-  // Requirement: Username, Password, AND the Key File must be present
   if(!username || !password || !keyB64) {
     const el = document.getElementById('auth-alert');
     el.innerText = "All fields and the Security Key are required.";
@@ -50,7 +48,7 @@ async function doAuth() {
       body: JSON.stringify({
         username, 
         password, 
-        keyFile: keyB64 // Now sent for both login and register
+        keyFile: keyB64
       })
     });
     
