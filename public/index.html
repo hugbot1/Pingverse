@@ -3,26 +3,114 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TechChat</title>
+  <title>TechChat | Secure Messaging</title>
   <style>
-    :root { --bg: #0f0f0f; --surface: #1a1a1a; --text: #f0f0f0; --accent: #3b82f6; --danger: #ef4444; --green: #22c55e; }
-    body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; height: 100vh; }
-    #auth-screen, #chat-screen { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .card { background: var(--surface); padding: 2rem; border-radius: 12px; width: 320px; border: 1px solid #333; }
-    .tabs { display: flex; gap: 10px; margin-bottom: 1rem; }
-    .tab { cursor: pointer; opacity: 0.6; background: none; border: none; color: white; font-weight: bold; }
-    .tab.active { opacity: 1; border-bottom: 2px solid var(--accent); }
-    .field { margin-bottom: 1rem; width: 100%; }
-    input { width: 100%; padding: 8px; box-sizing: border-box; background: #000; border: 1px solid #444; color: white; border-radius: 4px; }
-    .btn { width: 100%; padding: 10px; background: var(--accent); border: none; color: white; font-weight: bold; cursor: pointer; border-radius: 4px; }
-    .btn:disabled { opacity: 0.5; }
-    #chat-screen { display: none; }
-    #messages { flex: 1; width: 100%; overflow-y: auto; padding: 1rem; box-sizing: border-box; }
-    .msg { margin-bottom: 10px; padding: 8px; background: #222; border-radius: 4px; max-width: 80%; }
-    .msg.own { align-self: flex-end; background: #1e3a8a; }
-    .alert { color: var(--danger); font-size: 0.8rem; margin-bottom: 1rem; display: none; }
-    .key-zone { border: 2px dashed #444; padding: 10px; text-align: center; cursor: pointer; font-size: 0.8rem; }
-    .key-zone.ok { border-color: var(--green); color: var(--green); }
+    :root {
+      --bg: #0b0e11;
+      --sidebar: #15191c;
+      --surface: #1e2327;
+      --text: #e9edef;
+      --text-muted: #8696a0;
+      --accent: #00a884; /* WhatsApp style green */
+      --accent-hover: #06cf9c;
+      --own-msg: #005c4b;
+      --danger: #f15c5c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      background: var(--bg); 
+      color: var(--text); 
+      height: 100vh; 
+      display: flex; 
+      overflow: hidden;
+    }
+
+    /* ── AUTH SCREEN ── */
+    #auth-screen { 
+      flex: 1; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center;
+      background: linear-gradient(135deg, #0b0e11 0%, #15191c 100%);
+    }
+
+    .card { 
+      background: var(--surface); 
+      padding: 2.5rem; 
+      border-radius: 16px; 
+      width: 380px; 
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    h1 { font-size: 1.8rem; margin-bottom: 1.5rem; text-align: center; color: var(--accent); }
+
+    .tabs { display: flex; border-bottom: 1px solid #333; margin-bottom: 1.5rem; }
+    .tab { 
+      flex: 1; padding: 10px; cursor: pointer; background: none; 
+      border: none; color: var(--text-muted); font-weight: 600; transition: 0.3s;
+    }
+    .tab.active { color: var(--accent); border-bottom: 3px solid var(--accent); }
+
+    .field { margin-bottom: 1.2rem; }
+    input { 
+      width: 100%; padding: 12px; background: #2a3338; 
+      border: 1px solid transparent; color: white; border-radius: 8px; outline: none;
+    }
+    input:focus { border-color: var(--accent); }
+
+    .btn { 
+      width: 100%; padding: 12px; background: var(--accent); border: none; 
+      color: white; font-weight: bold; cursor: pointer; border-radius: 8px; 
+      font-size: 1rem; transition: 0.2s;
+    }
+    .btn:hover { background: var(--accent-hover); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .key-zone { 
+      border: 2px dashed #444; padding: 15px; text-align: center; 
+      border-radius: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-muted);
+    }
+    .key-zone.ok { border-color: var(--accent); color: var(--accent); background: rgba(0, 168, 132, 0.1); }
+
+    /* ── CHAT SCREEN ── */
+    #chat-screen { display: none; flex: 1; flex-direction: row; }
+
+    /* Sidebar */
+    .sidebar { 
+      width: 260px; background: var(--sidebar); display: flex; 
+      flex-direction: column; border-right: 1px solid #222;
+    }
+    .sidebar-header { padding: 20px; font-weight: bold; border-bottom: 1px solid #222; }
+    .user-info { padding: 20px; margin-top: auto; border-top: 1px solid #222; display: flex; align-items: center; justify-content: space-between;}
+
+    /* Main Chat Area */
+    .main-chat { flex: 1; display: flex; flex-direction: column; background: #0b141a; }
+    
+    #messages { 
+      flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 8px;
+    }
+
+    .msg { 
+      padding: 8px 12px; border-radius: 8px; max-width: 65%; font-size: 0.95rem;
+      line-height: 1.4; position: relative; background: var(--surface); align-self: flex-start;
+    }
+    .msg.own { align-self: flex-end; background: var(--own-msg); }
+
+    .msg-meta { font-size: 0.7rem; color: var(--text-muted); margin-bottom: 4px; display: block; }
+    
+    /* Input Area */
+    .input-area { padding: 15px 20px; background: var(--sidebar); display: flex; gap: 12px; align-items: center; }
+    #msg-input { flex: 1; border-radius: 20px; padding: 12px 20px; background: #2a3942; border: none; }
+
+    .logout-btn { background: none; border: 1px solid var(--danger); color: var(--danger); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+    .logout-btn:hover { background: var(--danger); color: white; }
+
+    .alert { color: var(--danger); background: rgba(241, 92, 92, 0.1); padding: 10px; border-radius: 4px; margin-bottom: 1rem; display: none; font-size: 0.85rem; }
+
   </style>
 </head>
 <body>
@@ -31,16 +119,16 @@
   <div class="card">
     <h1>TechChat</h1>
     <div class="tabs">
-      <button id="tab-login" class="tab active" onclick="switchTab('login')">Sign In</button>
-      <button id="tab-register" class="tab" onclick="switchTab('register')">Register</button>
+      <button id="tab-login" class="tab active" onclick="switchTab('login')">SIGN IN</button>
+      <button id="tab-register" class="tab" onclick="switchTab('register')">REGISTER</button>
     </div>
     <div id="auth-alert" class="alert"></div>
-    <div class="field"><input id="f-username" type="text" placeholder="Username"></div>
-    <div class="field"><input id="f-password" type="password" placeholder="Password"></div>
+    <div class="field"><input id="f-username" type="text" placeholder="Username" autocomplete="username"></div>
+    <div class="field"><input id="f-password" type="password" placeholder="Password" autocomplete="current-password"></div>
     <div class="field">
       <div class="key-zone" id="key-zone">
         <input type="file" id="key-input" style="display:none" onchange="handleFile(this.files)">
-        <span id="key-label">Click to upload Key File</span>
+        <span id="key-label">Upload Key File</span>
       </div>
     </div>
     <button id="auth-btn" class="btn" onclick="doAuth()">Sign In</button>
@@ -48,14 +136,21 @@
 </div>
 
 <div id="chat-screen">
-  <div style="padding:10px; background:#111; width:100%; display:flex; justify-content:space-between">
-    <span id="user-badge">...</span>
-    <button onclick="doSignOut()">Logout</button>
+  <div class="sidebar">
+    <div class="sidebar-header">Channels</div>
+    <div style="padding: 20px; color: var(--text-muted); font-size: 0.9rem;"># general</div>
+    <div class="user-info">
+      <span id="user-badge" style="font-weight: 600; color: var(--accent);">...</span>
+      <button class="logout-btn" onclick="doSignOut()">Logout</button>
+    </div>
   </div>
-  <div id="messages"></div>
-  <div style="padding:10px; display:flex; width:100%; box-sizing:border-box">
-    <input id="msg-input" placeholder="Type a message..." style="flex:1">
-    <button onclick="doSend()" style="width:60px">Send</button>
+  
+  <div class="main-chat">
+    <div id="messages"></div>
+    <div class="input-area">
+      <input id="msg-input" placeholder="Type a message..." autocomplete="off">
+      <button class="btn" onclick="doSend()" style="width: auto; padding: 10px 20px;">Send</button>
+    </div>
   </div>
 </div>
 

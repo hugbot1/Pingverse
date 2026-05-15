@@ -35,12 +35,11 @@ const msgSchema = new mongoose.Schema({
 });
 const Message = mongoose.model('Message', msgSchema);
 
-// ── Security & Middleware ─────────────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc:  ["'self'", "'unsafe-inline'"],
+      scriptSrc:  ["'self'", "'unsafe-inline'", "https://cdn.socket.io"],
       scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc:   ["'self'", "'unsafe-inline'"],
       connectSrc: ["'self'"],
@@ -72,7 +71,6 @@ app.post('/auth/register', authLimiter, async (req, res) => {
   const { username, password, keyFile } = req.body;
   if (!username || !password || !keyFile) return res.status(400).json({ error: 'Missing fields' });
 
-  // Key File Verification
   try {
     const provided = Buffer.from(keyFile, 'base64');
     if (provided.length !== SERVER_KEY_BYTES.length || !crypto.timingSafeEqual(SERVER_KEY_BYTES, provided)) {
