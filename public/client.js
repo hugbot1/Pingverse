@@ -35,7 +35,7 @@ async function doAuth() {
   const password = document.getElementById('f-password').value;
   if(!username || !password || !keyB64) {
     const el = document.getElementById('auth-alert');
-    el.innerText = "All fields and Key required.";
+    el.innerText = "All fields and the Security Key are required.";
     el.style.display = 'block';
     return;
   }
@@ -63,7 +63,7 @@ function enterChat(token) {
   socket.on('welcome', ({ username, role, history }) => { 
     myUsername = username;
     myRole = role;
-    document.getElementById('user-badge').innerText = username + (role==='admin' ? ' (Admin)' : '');
+    document.getElementById('user-badge').innerText = username + (role==='admin' ? ' 👑' : '');
     if(role === 'admin') document.getElementById('admin-tools').style.display = 'block';
     fullHistory = history; 
     applyFilter();
@@ -73,13 +73,12 @@ function enterChat(token) {
 
   socket.on('announcement', (data) => {
     const bar = document.getElementById('broadcast-bar');
-    const txt = document.getElementById('bc-text');
-    if(!data.msg) return bar.style.display = 'none';
+    if(!data.msg) { bar.style.display = 'none'; return; }
     bar.style.display = 'block';
-    txt.innerText = data.msg;
+    document.getElementById('bc-text').innerText = data.msg;
     if(data.important) {
-      bar.classList.add('flash-urgent');
-      setTimeout(() => bar.classList.remove('flash-urgent'), 5000);
+      bar.classList.add('important-flash');
+      setTimeout(() => bar.classList.remove('important-flash'), 5000);
     }
   });
 
@@ -119,15 +118,15 @@ function applyFilter() {
 
   document.getElementById('messages').innerHTML = filtered.map(m => `
     <div class="msg ${m.user === myUsername ? 'own' : ''}">
-      <span class="msg-meta">${m.user} ${myRole==='admin' ? `<button onclick="delMsg('${m._id}')" style="color:var(--danger); border:none; background:none; cursor:pointer; margin-left:5px;">[Delete]</button>` : ''}</span>
+      <span class="msg-meta">${m.user} ${myRole === 'admin' ? `<button onclick="deleteMsg('${m._id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;margin-left:8px;">[X]</button>` : ''}</span>
       <span>${m.msg}</span>
       <span class="msg-time">${new Date(m.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
     </div>
   `).join('');
 }
 
-function delMsg(id) { socket.emit('delete message', id); }
-function updateBC() {
+function deleteMsg(id) { socket.emit('delete message', id); }
+function updateBroadcast() {
   const msg = document.getElementById('bc-input').value;
   const important = document.getElementById('bc-check').checked;
   socket.emit('set announcement', { msg, important });
@@ -158,4 +157,4 @@ function doSend() {
 }
 
 function doSignOut() { sessionStorage.clear(); location.reload(); }
-window.onload = () => { if(sessionStorage.getItem('tc_token')) enterChat(sessionStorage.getItem('tc_token')); };
+window.onload = () => { const t = sessionStorage.getItem('tc_token'); if(t) enterChat(t); };
