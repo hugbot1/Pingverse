@@ -114,13 +114,14 @@ io.on('connection', async (socket) => {
   socket.emit('announcement', lastBC || { msg: '', important: false });
 
   const rawHistory = await Message.find({
-    $or: [{ to: 'global' }, { to: name }, { user: name }]
+    $or: [{ to: 'global' }, { to: { $exists: false } }, { to: name }, { user: name }]
   }).sort({ ts: -1 }).limit(150);
 
   const history = rawHistory.map(doc => {
     const m = doc.toObject();
     return {
       ...m,
+      to: m.to !== undefined ? m.to : 'global',
       replyTo: m.replyTo !== undefined ? m.replyTo : null,
       edited: m.edited !== undefined ? m.edited : false
     };

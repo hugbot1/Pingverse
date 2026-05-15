@@ -173,10 +173,11 @@ function applyFilter() {
   const sort = document.getElementById('s-sort').value;
 
   let filtered = fullHistory.filter(m => {
-    const isGlobalView = !activePrivateUser && (!m.to || m.to === 'global');
+    const msgTo = m.to || 'global';
+    const isGlobalView = !activePrivateUser && msgTo === 'global';
     const isPrivateView = activePrivateUser && (
-      (m.user === myUsername && m.to === activePrivateUser) ||
-      (m.user === activePrivateUser && m.to === myUsername)
+      (m.user === myUsername && msgTo === activePrivateUser) ||
+      (m.user === activePrivateUser && msgTo === myUsername)
     );
     return isGlobalView || isPrivateView;
   });
