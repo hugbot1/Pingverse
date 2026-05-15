@@ -14,11 +14,17 @@
 
   #auth-screen { flex: 1; display: flex; align-items: center; justify-content: center; }
   .card { background: var(--surface); padding: 2rem; border-radius: 12px; width: 350px; }
+  
   .tabs { display: flex; gap: 10px; margin-bottom: 1rem; border-bottom: 1px solid #333; }
-  .tab { flex: 1; padding: 10px; cursor: pointer; background: none; border: none; color: var(--text-muted); font-weight: bold; }
+  .tab { flex: 1; padding: 10px; cursor: pointer; background: none; border: none; color: var(--text-muted); font-weight: bold; transition: all 0.25s ease; border-radius: 6px 6px 0 0; }
+  .tab:hover { background: rgba(0, 168, 132, 0.08); color: var(--text); }
   .tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+  
   input, select { width: 100%; padding: 10px; margin-bottom: 10px; background: #2a3338; border: 1px solid #444; color: white; border-radius: 6px; outline: none; }
-  .btn { width: 100%; padding: 12px; background: var(--accent); border: none; color: white; font-weight: bold; border-radius: 6px; cursor: pointer; }
+  
+  .btn { width: 100%; padding: 12px; background: var(--accent); border: none; color: white; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.25s ease; }
+  .btn:hover { background: #009675; filter: brightness(1.1); box-shadow: 0 4px 12px rgba(0, 168, 132, 0.2); }
+  
   .key-zone { border: 2px dashed #444; padding: 10px; text-align: center; border-radius: 6px; cursor: pointer; margin-bottom: 10px; font-size: 0.8rem; }
   .key-zone.ok { border-color: var(--accent); color: var(--accent); }
 
@@ -34,6 +40,10 @@
   .main-chat { flex: 1; display: flex; flex-direction: column; position: relative; background: var(--bg); }
   .chat-header { padding: 15px 20px; background: var(--sidebar); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #222; height: 60px; }
   
+  /* Top Bar Actions Transition Patches */
+  .chat-header button { transition: all 0.25s ease; }
+  .chat-header button:hover { background: rgba(0, 168, 132, 0.15) !important; filter: brightness(1.1); }
+
   #broadcast-bar { padding: 8px; background: #2a3338; text-align: center; font-weight: bold; font-size: 0.8rem; border-bottom: 1px solid #444; display: none; }
   @keyframes flash-red { 0%, 100% { background: #2a3338; } 50% { background: var(--danger); } }
   .important-flash { animation: flash-red 1s 5; }
@@ -71,9 +81,8 @@
   .alert { color: var(--danger); font-size: 0.8rem; margin-bottom: 1rem; display: none; }
 
   #back-btn { display: none; background: none; border: 1px solid var(--accent); color: var(--accent); padding: 5px 12px; border-radius: 4px; cursor: pointer; margin-right: 12px; font-size: 0.8rem; font-weight: bold; }
-  #back-btn:hover { background: rgba(0, 168, 132, 0.1); }
 
-  /* PATCHED: Clear Profile & Settings Footer Layout */
+  /* Clear Profile & Settings Footer Layout */
   .sidebar-footer {
     padding: 12px 15px; 
     border-top: 1px solid #222; 
@@ -114,11 +123,10 @@
   .gear-icon {
     font-size: 1.1rem;
     color: var(--text-muted);
-    transition: color 0.2s, transform 0.3s ease;
+    transition: color 0.2s ease;
   }
   .profile-section:hover .gear-icon {
     color: var(--accent);
-    transform: rotate(45deg);
   }
   .logout-row {
     display: flex;
