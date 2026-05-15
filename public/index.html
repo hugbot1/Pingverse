@@ -10,7 +10,7 @@
       --text-muted: #8696a0; --accent: #00a884; --own-msg: #005c4b; --danger: #f15c5c;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; }
+    body { font-family: sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
 
     #auth-screen { flex: 1; display: flex; align-items: center; justify-content: center; }
     .card { background: var(--surface); padding: 2rem; border-radius: 12px; width: 350px; }
@@ -22,7 +22,7 @@
     .key-zone { border: 2px dashed #444; padding: 10px; text-align: center; border-radius: 6px; cursor: pointer; margin-bottom: 10px; font-size: 0.8rem; }
     .key-zone.ok { border-color: var(--accent); color: var(--accent); }
 
-    #chat-screen { display: none; flex: 1; }
+    #chat-screen { display: none; flex: 1; height: 100vh; }
     .sidebar { width: 280px; background: var(--sidebar); display: flex; flex-direction: column; border-right: 1px solid #222; }
     .sidebar-header { padding: 15px; border-bottom: 1px solid #222; }
     .user-list { flex: 1; overflow-y: auto; }
@@ -30,20 +30,20 @@
     .dot { width: 8px; height: 8px; border-radius: 50%; }
     
     .main-chat { flex: 1; display: flex; flex-direction: column; }
-    .chat-header { padding: 15px 20px; background: var(--sidebar); display: flex; justify-content: space-between; border-bottom: 1px solid #222; }
-    .search-panel { padding: 10px 20px; background: var(--surface); display: flex; gap: 10px; border-bottom: 1px solid #222; }
+    .chat-header { padding: 15px 20px; background: var(--sidebar); display: flex; justify-content: space-between; border-bottom: 1px solid #222; position: relative; }
     
-    #messages { 
-      flex: 1; overflow-y: auto; padding: 20px; display: flex; 
-      flex-direction: column; gap: 10px; 
-    }
+    #broadcast-bar { padding: 10px; background: #2a3338; border-bottom: 1px solid #444; text-align: center; font-weight: bold; font-size: 0.85rem; display: none; }
+    @keyframes flash-urgent { 0%, 100% { background: #2a3338; } 50% { background: var(--danger); } }
+    .flash-urgent { animation: flash-urgent 1s 5; }
 
+    #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
     .msg { padding: 10px; border-radius: 8px; max-width: 75%; background: var(--surface); align-self: flex-start; }
     .msg.own { align-self: flex-end; background: var(--own-msg); }
     .msg-meta { font-size: 0.7rem; color: var(--accent); font-weight: bold; display: block; margin-bottom: 4px; }
     .msg-time { font-size: 0.6rem; color: var(--text-muted); float: right; margin-top: 5px; margin-left: 10px; }
-    .input-area { padding: 20px; background: var(--sidebar); display: flex; gap: 10px; }
     .alert { color: var(--danger); font-size: 0.8rem; margin-bottom: 1rem; display: none; }
+    
+    #admin-tools { padding: 15px; background: #000; border-top: 1px solid #333; display: none; }
   </style>
 </head>
 <body>
@@ -66,13 +66,22 @@
   <div class="sidebar">
     <div class="sidebar-header"><input id="user-search" placeholder="Search people..." oninput="filterUsers()"></div>
     <div id="user-list" class="user-list"></div>
+    
+    <div id="admin-tools">
+      <p style="font-size:0.7rem; color:var(--accent); margin-bottom:5px;">ADMIN TOOLS</p>
+      <input id="bc-input" placeholder="Broadcast message..." style="font-size:0.8rem;">
+      <label style="font-size:0.7rem;"><input type="checkbox" id="bc-check"> Urgent Flash</label>
+      <button class="btn" onclick="updateBC()" style="padding:5px; margin-top:5px; font-size:0.7rem;">Update Broadcast</button>
+    </div>
+
     <div style="padding:15px; border-top:1px solid #222; display:flex; justify-content:space-between; align-items: center;">
       <span id="user-badge" style="color:var(--accent); font-weight: bold;">...</span>
       <button onclick="doSignOut()" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size: 0.8rem;">Logout</button>
     </div>
   </div>
   <div class="main-chat">
-    <div class="chat-header"><span>Chat</span><button onclick="toggleSearch()" style="background:none; border:1px solid var(--accent); color:var(--accent); padding:4px 8px; border-radius:4px; cursor:pointer">Search Messages</button></div>
+    <div class="chat-header"><span>Chat</span><button onclick="toggleSearch()" style="background:none; border:1px solid var(--accent); color:var(--accent); padding:4px 8px; border-radius:4px; cursor:pointer">Search</button></div>
+    <div id="broadcast-bar"><span id="bc-text"></span></div>
     <div id="search-panel" class="search-panel" style="display:none">
       <input id="s-content" placeholder="Content..." oninput="applyFilter()"><input id="s-user" placeholder="User..." oninput="applyFilter()">
       <select id="s-sort" onchange="applyFilter()"><option value="new">Newest</option><option value="old">Oldest</option></select>
