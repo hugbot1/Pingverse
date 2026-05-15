@@ -89,10 +89,24 @@ function applyFilter() {
   const userQ = document.getElementById('s-user').value.toLowerCase();
   const sort = document.getElementById('s-sort').value;
 
-  let filtered = fullHistory.filter(m => m.msg.toLowerCase().includes(query) && m.user.toLowerCase().includes(userQ));
-  if(sort === 'old') filtered.sort((a,b) => new Date(a.ts) - new Date(b.ts));
-  else filtered.sort((a,b) => new Date(b.ts) - new Date(a.ts));
+  // 1. Filter the history based on search inputs
+  let filtered = fullHistory.filter(m => 
+    m.msg.toLowerCase().includes(query) && 
+    m.user.toLowerCase().includes(userQ)
+  );
 
+  // 2. Sort Logic: 
+  // For a standard chat, "Newest" means the message with the latest timestamp 
+  // should be at the BOTTOM of the list.
+  if (sort === 'new') {
+    // Ascending: Oldest (top) to Newest (bottom)
+    filtered.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+  } else {
+    // Descending: Newest (top) to Oldest (bottom) - strictly for "Search" mode
+    filtered.sort((a, b) => new Date(b.ts) - new Date(a.ts));
+  }
+
+  // 3. Render to DOM
   document.getElementById('messages').innerHTML = filtered.map(m => `
     <div class="msg ${m.user === myUsername ? 'own' : ''}">
       <span class="msg-meta">${m.user}</span>
@@ -100,6 +114,9 @@ function applyFilter() {
       <span class="msg-time">${new Date(m.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
     </div>
   `).join('');
+
+  // 4. Always scroll to the bottom so the fresh message is visible
+  scrollToBottom();
 }
 
 function scrollToBottom() {
