@@ -1,28 +1,28 @@
-const crypto  = require('crypto');
+const crypto = require('crypto');
 const express = require('express');
-const http    = require('http');
-const bcrypt  = require('bcryptjs');
-const jwt     = require('jsonwebtoken');
-const helmet  = require('helmet');
+const http = require('http');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const helmet = require('helmet');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const rateLimit = require('express-rate-limit');
 
-const app    = express();
+const app = express();
 const server = http.createServer(app);
 
+// ── Environment Variables ──────────────────────────────────────────────────
 const MONGO_URI = process.env.DATABASE_URL;
-const EXPECTED_KEY = process.env.ACCESS_KEY;
-if (!EXPECTED_KEY) {
-  console.warn("WARNING: ACCESS_KEY is not set in environment variables!");
-}
-const JWT_SECRET = process.env.JWT_SECRET;
+const ACCESS_KEY = process.env.ACCESS_KEY;
+const ADMIN_KEY = process.env.ADMIN_KEY;
+const JWT_SECRET = process.env.JWT_SECRET || 'emergency-fallback-secret';
+
 const onlineUsers = new Set();
+let globalAnnouncement = { msg: '', important: false };
 
-mongoose.connect(MONGO_URI)
-  .then(() => console.log("Connected to MongoDB"))
-  .catch(err => console.error("DB Error:", err));
+mongoose.connect(MONGO_URI).then(() => console.log("DB Connected"));
 
+// ── Models ──────────────────────────────────────────────────────────────────
 const User = mongoose.model('User', new mongoose.Schema({
   username: { type: String, unique: true, required: true },
   hash: { type: String, required: true }
@@ -34,98 +34,90 @@ const Message = mongoose.model('Message', new mongoose.Schema({
   ts: { type: Date, default: Date.now }
 }));
 
+// ── Security ────────────────────────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc:  ["'self'", "'unsafe-inline'", "https://cdn.socket.io"],
-      scriptSrcAttr: ["'unsafe-inline'"],
-      styleSrc:   ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.socket.io"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
       connectSrc: ["'self'"],
     },
   },
 }));
-
 app.use(express.json({ limit: '16kb' }));
 app.use(express.static('public'));
 
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 25 });
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+async function verifyKeyRole(fileB64) {
+  if (!fileB64) return null;
+  const provided = Buffer.from(fileB64, 'base64').toString('utf8').trim();
+  if (ADMIN_KEY && provided === ADMIN_KEY.trim()) return 'admin';
+  if (ACCESS_KEY && provided === ACCESS_KEY.trim()) return 'user';
+  return null;
+}
+
+// ── Auth Routes ─────────────────────────────────────────────────────────────
 app.post('/auth/register', authLimiter, async (req, res) => {
   const { username, password, keyFile } = req.body;
+  const role = await verifyKeyRole(keyFile);
+  if (!role) return res.status(403).json({ error: 'Invalid Security Key' });
 
   try {
-    if (!EXPECTED_KEY) {
-      return res.status(500).json({ error: 'Server security misconfigured' });
-    }
-
-    if (!keyFile) {
-      return res.status(403).json({ error: 'Key file required for registration' });
-    }
-
-    const providedKey = Buffer.from(keyFile, 'base64').toString('utf8').trim();
-    
-    if (providedKey !== EXPECTED_KEY.trim()) {
-      return res.status(403).json({ error: 'Invalid Key File: Access Denied' });
-    }
-
     const hash = await bcrypt.hash(password, 10);
-    const newUser = new User({ username, hash });
-    await newUser.save();
-    
-    res.json({ token: jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' }), username });
-  } catch (err) {
-    if (err.code === 11000) return res.status(400).json({ error: 'Username already taken' });
-    res.status(500).json({ error: 'Registration failed' });
-  }
+    await new User({ username, hash }).save();
+    res.json({ token: jwt.sign({ username, role }, JWT_SECRET), username, role });
+  } catch (err) { res.status(400).json({ error: 'User exists' }); }
 });
 
 app.post('/auth/login', authLimiter, async (req, res) => {
   const { username, password, keyFile } = req.body;
+  const role = await verifyKeyRole(keyFile);
+  if (!role) return res.status(403).json({ error: 'Invalid Security Key' });
 
-  try {
-    if (!EXPECTED_KEY) return res.status(500).json({ error: 'Server security misconfigured' });
-    if (!keyFile) return res.status(403).json({ error: 'Key file required for access' });
-
-    const providedKey = Buffer.from(keyFile, 'base64').toString('utf8').trim();
-    if (providedKey !== EXPECTED_KEY.trim()) {
-      return res.status(403).json({ error: 'Security Key mismatch. Access denied.' });
-    }
-
-    const user = await User.findOne({ username });
-    if (!user || !(await bcrypt.compare(password, user.hash))) {
-      return res.status(401).json({ error: 'Invalid username or password' });
-    }
-
-    res.json({ token: jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' }), username });
-  } catch (err) {
-    res.status(500).json({ error: 'Login process error' });
+  const user = await User.findOne({ username });
+  if (!user || !(await bcrypt.compare(password, user.hash))) {
+    return res.status(401).json({ error: 'Invalid credentials' });
   }
+  res.json({ token: jwt.sign({ username, role }, JWT_SECRET), username, role });
 });
 
+// ── Sockets ─────────────────────────────────────────────────────────────────
 const io = new Server(server);
 
 io.use((socket, next) => {
   try {
     const payload = jwt.verify(socket.handshake.auth?.token, JWT_SECRET);
-    socket.username = payload.username;
+    socket.user = payload;
     next();
-  } catch { next(new Error('Unauthorised')); }
+  } catch { next(new Error('Auth failed')); }
 });
 
 io.on('connection', async (socket) => {
-  const name = socket.username;
-  onlineUsers.add(name);
+  onlineUsers.add(socket.user.username);
   io.emit('status change');
 
+  socket.emit('announcement', globalAnnouncement);
   const history = await Message.find().sort({ ts: -1 }).limit(100);
-  socket.emit('welcome', { username: name, history: history.reverse() });
+  socket.emit('welcome', { username: socket.user.username, role: socket.user.role, history: history.reverse() });
 
-  socket.on('chat message', async (raw) => {
-    const msg = raw.toString().trim().substring(0, 500);
-    if (!msg) return;
-    const entry = await new Message({ user: name, msg }).save();
+  socket.on('chat message', async (msg) => {
+    const entry = await new Message({ user: socket.user.username, msg: msg.substring(0,500) }).save();
     io.emit('chat message', entry);
+  });
+
+  socket.on('set announcement', (data) => {
+    if (socket.user.role !== 'admin') return;
+    globalAnnouncement = { msg: data.msg, important: data.important };
+    io.emit('announcement', globalAnnouncement);
+  });
+
+  socket.on('delete message', async (id) => {
+    if (socket.user.role !== 'admin') return;
+    await Message.findByIdAndDelete(id);
+    io.emit('msg deleted', id);
   });
 
   socket.on('get users', async () => {
@@ -133,10 +125,7 @@ io.on('connection', async (socket) => {
     socket.emit('user list', all.map(u => ({ name: u.username, online: onlineUsers.has(u.username) })));
   });
 
-  socket.on('disconnect', () => {
-    onlineUsers.delete(name);
-    io.emit('status change');
-  });
+  socket.on('disconnect', () => { onlineUsers.delete(socket.user.username); io.emit('status change'); });
 });
 
-server.listen(process.env.PORT || 3000, () => console.log("Server Live"));
+server.listen(process.env.PORT || 3000);

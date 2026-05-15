@@ -3,84 +3,80 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TechChat</title>
+  <title>TechChat | Secured</title>
   <style>
-    :root {
-      --bg: #0b0e11; --sidebar: #15191c; --surface: #1e2327; --text: #e9edef;
-      --text-muted: #8696a0; --accent: #00a884; --own-msg: #005c4b; --danger: #f15c5c;
-    }
+    :root { --bg: #0b0e11; --sidebar: #15191c; --surface: #1e2327; --text: #e9edef; --accent: #00a884; --own-msg: #005c4b; --danger: #f15c5c; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; }
+    body { font-family: sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
 
-    #auth-screen { flex: 1; display: flex; align-items: center; justify-content: center; }
+    #auth-screen { flex: 1; display: flex; align-items: center; justify-content: center; z-index: 100; background: var(--bg); }
     .card { background: var(--surface); padding: 2rem; border-radius: 12px; width: 350px; }
-    .tabs { display: flex; gap: 10px; margin-bottom: 1rem; border-bottom: 1px solid #333; }
-    .tab { flex: 1; padding: 10px; cursor: pointer; background: none; border: none; color: var(--text-muted); font-weight: bold; }
-    .tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
     input, select { width: 100%; padding: 10px; margin-bottom: 10px; background: #2a3338; border: 1px solid #444; color: white; border-radius: 6px; outline: none; }
     .btn { width: 100%; padding: 12px; background: var(--accent); border: none; color: white; font-weight: bold; border-radius: 6px; cursor: pointer; }
-    .key-zone { border: 2px dashed #444; padding: 10px; text-align: center; border-radius: 6px; cursor: pointer; margin-bottom: 10px; font-size: 0.8rem; }
+    .key-zone { border: 2px dashed #444; padding: 15px; text-align: center; border-radius: 6px; cursor: pointer; margin-bottom: 10px; }
     .key-zone.ok { border-color: var(--accent); color: var(--accent); }
 
     #chat-screen { display: none; flex: 1; }
     .sidebar { width: 280px; background: var(--sidebar); display: flex; flex-direction: column; border-right: 1px solid #222; }
-    .sidebar-header { padding: 15px; border-bottom: 1px solid #222; }
-    .user-list { flex: 1; overflow-y: auto; }
-    .user-item { padding: 10px 20px; font-size: 0.9rem; border-bottom: 1px solid #1a1e21; display: flex; justify-content: space-between; align-items: center; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; }
-    
-    .main-chat { flex: 1; display: flex; flex-direction: column; }
-    .chat-header { padding: 15px 20px; background: var(--sidebar); display: flex; justify-content: space-between; border-bottom: 1px solid #222; }
-    .search-panel { padding: 10px 20px; background: var(--surface); display: flex; gap: 10px; border-bottom: 1px solid #222; }
-    
-    #messages { 
-      flex: 1; overflow-y: auto; padding: 20px; display: flex; 
-      flex-direction: column; gap: 10px; 
-    }
+    .main-chat { flex: 1; display: flex; flex-direction: column; position: relative; }
 
-    .msg { padding: 10px; border-radius: 8px; max-width: 75%; background: var(--surface); align-self: flex-start; }
+    #broadcast-bar { padding: 12px; text-align: center; font-weight: bold; font-size: 0.9rem; border-bottom: 1px solid #333; }
+    @keyframes flash { 0%, 100% { background: #333; } 50% { background: var(--danger); } }
+    .urgent { animation: flash 1s 5; }
+
+    #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 8px; }
+    .msg { padding: 10px 14px; border-radius: 8px; max-width: 70%; background: var(--surface); position: relative; }
     .msg.own { align-self: flex-end; background: var(--own-msg); }
-    .msg-meta { font-size: 0.7rem; color: var(--accent); font-weight: bold; display: block; margin-bottom: 4px; }
-    .msg-time { font-size: 0.6rem; color: var(--text-muted); float: right; margin-top: 5px; margin-left: 10px; }
-    .input-area { padding: 20px; background: var(--sidebar); display: flex; gap: 10px; }
-    .alert { color: var(--danger); font-size: 0.8rem; margin-bottom: 1rem; display: none; }
+    .del-btn { color: var(--danger); cursor: pointer; margin-left: 10px; font-size: 0.8rem; border: none; background: none; }
+    .msg-time { font-size: 0.6rem; opacity: 0.6; float: right; margin-top: 4px; margin-left: 8px; }
+
+    .admin-panel { padding: 15px; background: #000; border-top: 1px solid #333; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
   </style>
 </head>
 <body>
 
 <div id="auth-screen">
   <div class="card">
-    <div class="tabs"><button id="tab-login" class="tab active" onclick="switchTab('login')">LOGIN</button><button id="tab-register" class="tab" onclick="switchTab('register')">REGISTER</button></div>
-    <div id="auth-alert" class="alert"></div>
-    <input id="f-username" type="text" placeholder="Username">
-    <input id="f-password" type="password" placeholder="Password">
-    <div class="key-zone" id="key-zone" onclick="document.getElementById('key-input').click()">
-      <input type="file" id="key-input" style="display:none" onchange="handleFile(this.files)">
-      <span id="key-label">Upload Key File</span>
+    <div style="display:flex; margin-bottom: 20px;">
+      <button onclick="authMode='login'" style="flex:1; background:none; border:none; color:white; cursor:pointer;">Login</button>
+      <button onclick="authMode='register'" style="flex:1; background:none; border:none; color:white; cursor:pointer;">Join</button>
     </div>
-    <button id="auth-btn" class="btn" onclick="doAuth()">Sign In</button>
+    <input id="f-user" placeholder="Username">
+    <input id="f-pass" type="password" placeholder="Password">
+    <div class="key-zone" id="key-zone" onclick="document.getElementById('k-in').click()">
+      <input type="file" id="k-in" style="display:none" onchange="handleFile(this.files)">
+      <span id="k-lab">Upload Security Key</span>
+    </div>
+    <button class="btn" onclick="doAuth()">Verify & Enter</button>
   </div>
 </div>
 
 <div id="chat-screen">
   <div class="sidebar">
-    <div class="sidebar-header"><input id="user-search" placeholder="Search people..." oninput="filterUsers()"></div>
-    <div id="user-list" class="user-list"></div>
-    <div style="padding:15px; border-top:1px solid #222; display:flex; justify-content:space-between; align-items: center;">
-      <span id="user-badge" style="color:var(--accent); font-weight: bold;">...</span>
-      <button onclick="doSignOut()" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size: 0.8rem;">Logout</button>
+    <div style="padding:15px;"><input id="u-search" placeholder="Search Users..." oninput="filterUsers()"></div>
+    <div id="user-list" style="flex:1; overflow-y:auto;"></div>
+    
+    <div id="admin-tools" class="admin-panel" style="display:none;">
+      <p style="color:var(--accent); font-size:0.7rem; margin-bottom:5px;">ADMIN BROADCAST</p>
+      <input id="bc-msg" placeholder="Message..." style="font-size:0.8rem;">
+      <label style="font-size:0.7rem;"><input type="checkbox" id="bc-urg"> Important</label>
+      <button class="btn" onclick="sendBC()" style="padding:5px; margin-top:5px; font-size:0.7rem;">Broadcast</button>
+    </div>
+
+    <div style="padding:15px; border-top:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+      <span id="my-name">...</span>
+      <button onclick="location.reload()" style="background:none; border:none; color:var(--danger); cursor:pointer;">Logout</button>
     </div>
   </div>
+
   <div class="main-chat">
-    <div class="chat-header"><span>Chat</span><button onclick="toggleSearch()" style="background:none; border:1px solid var(--accent); color:var(--accent); padding:4px 8px; border-radius:4px; cursor:pointer">Search Messages</button></div>
-    <div id="search-panel" class="search-panel" style="display:none">
-      <input id="s-content" placeholder="Content..." oninput="applyFilter()"><input id="s-user" placeholder="User..." oninput="applyFilter()">
-      <select id="s-sort" onchange="applyFilter()"><option value="new">Newest</option><option value="old">Oldest</option></select>
-    </div>
+    <div id="broadcast-bar" style="display:none;"><span id="bc-txt"></span></div>
+    <div style="padding:15px; border-bottom:1px solid #222; font-weight:bold;">Chat</div>
     <div id="messages"></div>
-    <form class="input-area" onsubmit="event.preventDefault(); doSend();">
-      <input id="msg-input" placeholder="Type a message..." autocomplete="off" style="margin-bottom:0">
-      <button class="btn" type="submit" style="width:80px">Send</button>
+    <form style="padding:20px; display:flex; gap:10px;" onsubmit="event.preventDefault(); doSend();">
+      <input id="m-in" placeholder="Type a message..." autocomplete="off" style="margin:0;">
+      <button class="btn" style="width:80px;">Send</button>
     </form>
   </div>
 </div>

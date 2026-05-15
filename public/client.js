@@ -1,161 +1,96 @@
-let authMode = 'login', keyB64 = null, socket = null, myUsername = null, fullHistory = [];
-let unreadCount = 0;
-const originalTitle = "TechChat";
-
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) {
-    unreadCount = 0;
-    document.title = originalTitle;
-  }
-});
-
-const switchTab = (m) => {
-  authMode = m;
-  document.getElementById('tab-login').classList.toggle('active', m==='login');
-  document.getElementById('tab-register').classList.toggle('active', m==='register');
-  document.getElementById('auth-btn').innerText = m==='login' ? 'Sign In' : 'Create Account';
-};
+let authMode = 'login', keyB64 = null, socket = null, myName = null, myRole = 'user', history = [];
+let unread = 0;
 
 const handleFile = (f) => {
-  if (!f[0]) return;
   const r = new FileReader();
   r.onload = e => { 
-    const parts = e.target.result.split(',');
-    if (parts.length > 1) {
-      keyB64 = parts[1];
-      document.getElementById('key-zone').classList.add('ok');
-      document.getElementById('key-label').innerText = "✓ Key Ready";
-    }
+    keyB64 = e.target.result.split(',')[1];
+    document.getElementById('key-zone').classList.add('ok');
+    document.getElementById('k-lab').innerText = "✓ Key Loaded";
   };
   r.readAsDataURL(f[0]);
 };
 
 async function doAuth() {
-  const username = document.getElementById('f-username').value;
-  const password = document.getElementById('f-password').value;
-  
-  if(!username || !password || !keyB64) {
-    const el = document.getElementById('auth-alert');
-    el.innerText = "All fields and the Security Key are required.";
-    el.style.display = 'block';
-    return;
-  }
+  const username = document.getElementById('f-user').value;
+  const password = document.getElementById('f-pass').value;
+  if(!username || !password || !keyB64) return alert("All fields + Key required");
 
-  try {
-    const res = await fetch('/auth/' + authMode, {
-      method: 'POST', 
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        username, 
-        password, 
-        keyFile: keyB64
-      })
-    });
-    
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error);
-    
-    sessionStorage.setItem('tc_token', data.token);
-    enterChat(data.token, data.username);
-  } catch(e) { 
-    const el = document.getElementById('auth-alert');
-    el.innerText = e.message; 
-    el.style.display = 'block'; 
-  }
+  const res = await fetch('/auth/' + authMode, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ username, password, keyFile: keyB64 })
+  });
+  const data = await res.json();
+  if(!res.ok) return alert(data.error);
+  
+  sessionStorage.setItem('tc_token', data.token);
+  initChat(data.token);
 }
 
-function enterChat(token, userPlaceholder) {
+function initChat(token) {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('chat-screen').style.display = 'flex';
 
   socket = io({ auth: { token } });
 
-  socket.on('welcome', ({ username, history }) => { 
-    myUsername = username;
-    document.getElementById('user-badge').innerText = username;
-    fullHistory = history; 
-    applyFilter();
-    scrollToBottomInstant();
+  socket.on('welcome', (data) => {
+    myName = data.username; myRole = data.role;
+    document.getElementById('my-name').innerText = myName + (myRole === 'admin' ? ' 👑' : '');
+    if(myRole === 'admin') document.getElementById('admin-tools').style.display = 'block';
+    history = data.history; render();
     socket.emit('get users');
+    setTimeout(scrollDown, 100);
   });
 
-  socket.on('chat message', (msg) => { 
-    fullHistory.push(msg); 
-    applyFilter();
-    scrollToBottomInstant();
-    
-    if (document.hidden) {
-      unreadCount++;
-      document.title = `(${unreadCount}) New Messages!`;
-    }
+  socket.on('announcement', (data) => {
+    const bar = document.getElementById('broadcast-bar');
+    if(!data.msg) return bar.style.display = 'none';
+    bar.style.display = 'block';
+    bar.className = data.important ? 'urgent' : '';
+    document.getElementById('bc-txt').innerText = data.msg;
   });
 
+  socket.on('chat message', (m) => { history.push(m); render(); scrollDown(); });
+  socket.on('msg deleted', (id) => { history = history.filter(m => m._id !== id); render(); });
   socket.on('status change', () => socket.emit('get users'));
-  
   socket.on('user list', (list) => {
     document.getElementById('user-list').innerHTML = list.map(u => `
-      <div class="user-item">
+      <div style="padding:10px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1a1e21;">
         <span>${u.name}</span>
-        <div class="dot" style="background:${u.online ? 'var(--accent)' : '#444'}"></div>
+        <div class="status-dot" style="background:${u.online ? 'var(--accent)' : '#444'}"></div>
       </div>
     `).join('');
   });
 }
 
-function applyFilter() {
-  const query = document.getElementById('s-content').value.toLowerCase();
-  const userQ = document.getElementById('s-user').value.toLowerCase();
-  const sort = document.getElementById('s-sort').value;
-
-  let filtered = fullHistory.filter(m => 
-    m.msg.toLowerCase().includes(query) && 
-    m.user.toLowerCase().includes(userQ)
-  );
-
-  if(sort === 'new') {
-    filtered.sort((a,b) => new Date(a.ts) - new Date(b.ts));
-  } else {
-    filtered.sort((a,b) => new Date(b.ts) - new Date(a.ts));
-  }
-
-  document.getElementById('messages').innerHTML = filtered.map(m => `
-    <div class="msg ${m.user === myUsername ? 'own' : ''}">
-      <span class="msg-meta">${m.user}</span>
-      <span>${m.msg}</span>
-      <span class="msg-time">${new Date(m.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+function render() {
+  document.getElementById('messages').innerHTML = history.map(m => `
+    <div class="msg ${m.user === myName ? 'own' : ''}">
+      <div style="font-size:0.7rem; color:var(--accent); font-weight:bold;">${m.user}</div>
+      <div>${m.msg} ${myRole === 'admin' ? `<button class="del-btn" onclick="delMsg('${m._id}')">🗑</button>` : ''}</div>
+      <div class="msg-time">${new Date(m.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
     </div>
   `).join('');
 }
 
-function scrollToBottomInstant() {
+function scrollDown() { 
   const m = document.getElementById('messages');
-  requestAnimationFrame(() => {
-    m.scrollTop = m.scrollHeight;
+  requestAnimationFrame(() => m.scrollTop = m.scrollHeight);
+}
+
+function sendBC() {
+  socket.emit('set announcement', { 
+    msg: document.getElementById('bc-msg').value, 
+    important: document.getElementById('bc-urg').checked 
   });
 }
 
-function toggleSearch() { 
-  const p = document.getElementById('search-panel');
-  p.style.display = p.style.display === 'none' ? 'flex' : 'none';
-}
-
-function filterUsers() {
-  const q = document.getElementById('user-search').value.toLowerCase();
-  document.querySelectorAll('.user-item').forEach(i => {
-    i.style.display = i.innerText.toLowerCase().includes(q) ? 'flex' : 'none';
-  });
-}
-
+function delMsg(id) { socket.emit('delete message', id); }
 function doSend() {
-  const i = document.getElementById('msg-input');
+  const i = document.getElementById('m-in');
   if(!i.value.trim()) return;
   socket.emit('chat message', i.value);
   i.value = '';
 }
 
-function doSignOut() { sessionStorage.clear(); location.reload(); }
-
-window.onload = () => {
-  const t = sessionStorage.getItem('tc_token');
-  if(t) enterChat(t, "...");
-};
+window.onload = () => { if(sessionStorage.getItem('tc_token')) initChat(sessionStorage.getItem('tc_token')); };
