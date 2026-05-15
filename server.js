@@ -11,7 +11,6 @@ const rateLimit = require('express-rate-limit');
 const app    = express();
 const server = http.createServer(app);
 
-// ── Database Connection ──────────────────────────────────────────────────────
 const MONGO_URI = process.env.DATABASE_URL;
 if (!MONGO_URI) {
   console.error("FATAL: DATABASE_URL environment variable not set.");
@@ -42,7 +41,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc:  ["'self'", "'unsafe-inline'"],
-      scriptSrcAttr: ["'unsafe-inline'"], // Fixes the non-functional buttons
+      scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc:   ["'self'", "'unsafe-inline'"],
       connectSrc: ["'self'"],
     },
@@ -58,7 +57,6 @@ const authLimiter = rateLimit({
   message: { error: 'Too many attempts, please try again later.' }
 });
 
-// ── Access Key Configuration ──────────────────────────────────────────────────
 if (!process.env.ACCESS_KEY) {
   console.error('FATAL: ACCESS_KEY environment variable not set.');
   process.exit(1);
@@ -70,7 +68,6 @@ function generateToken(username) {
   return jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' });
 }
 
-// ── Auth Routes ───────────────────────────────────────────────────────────────
 app.post('/auth/register', authLimiter, async (req, res) => {
   const { username, password, keyFile } = req.body;
   if (!username || !password || !keyFile) return res.status(400).json({ error: 'Missing fields' });
@@ -96,7 +93,6 @@ app.post('/auth/register', authLimiter, async (req, res) => {
 app.post('/auth/login', authLimiter, async (req, res) => {
   const { username, password, keyFile } = req.body;
 
-  // Key File Verification
   try {
     const provided = Buffer.from(keyFile, 'base64');
     if (provided.length !== SERVER_KEY_BYTES.length || !crypto.timingSafeEqual(SERVER_KEY_BYTES, provided)) {
@@ -112,7 +108,6 @@ app.post('/auth/login', authLimiter, async (req, res) => {
   res.json({ token: generateToken(username), username });
 });
 
-// ── Socket.io Chat Logic ─────────────────────────────────────────────────────
 const io = new Server(server);
 
 io.use((socket, next) => {
@@ -129,7 +124,6 @@ io.use((socket, next) => {
 io.on('connection', async (socket) => {
   const { username } = socket;
 
-  // Load last 50 messages from Cloud DB
   const history = await Message.find().sort({ ts: -1 }).limit(50);
   socket.emit('welcome', { username, history: history.reverse() });
 
@@ -138,7 +132,7 @@ io.on('connection', async (socket) => {
     if (!msg) return;
 
     const entry = new Message({ user: username, msg });
-    await entry.save(); // Saved permanently to Cloud MongoDB
+    await entry.save();
     io.emit('chat message', entry);
   });
 });
