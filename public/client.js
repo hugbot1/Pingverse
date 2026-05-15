@@ -111,7 +111,7 @@ function enterChat(token) {
 
   socket.on('user status alert', ({ target, muted, until }) => {
     if(target === myUsername && muted) {
-      alert(`You have been muted until: ${new Date(until).toLocaleTimeString()}`);
+      alert(`You have been timed out until: ${new Date(until).toLocaleTimeString()}`);
     }
     socket.emit('get users');
   });
@@ -128,7 +128,7 @@ function enterChat(token) {
   
   socket.on('user list', (list) => {
     document.getElementById('user-list').innerHTML = list.map(u => {
-      const muteLabel = u.isMuted ? ' <span style="color:var(--danger)">[Muted]</span>' : '';
+      const muteLabel = u.isMuted ? ' <span style="color:var(--danger)">[Timed Out]</span>' : '';
       const ownerLabel = u.role === 'admin' ? ' <small style="color:var(--accent); font-weight:bold;">(Owner)</small>' : '';
       
       const adminActions = (myRole === 'admin' && u.name !== myUsername) ? `
@@ -181,13 +181,15 @@ function applyFilter() {
     return isGlobalView || isPrivateView;
   });
 
-  filtered = filtered.filter(m => m.msg.toLowerCase().includes(query) && m.user.toLowerCase().includes(userQ));
+  filtered = filtered.filter(m => m.msg && m.msg.toLowerCase().includes(query) && m.user && m.user.toLowerCase().includes(userQ));
   
   if(sort === 'new') filtered.sort((a,b) => new Date(a.ts) - new Date(b.ts));
   else filtered.sort((a,b) => new Date(b.ts) - new Date(a.ts));
 
   document.getElementById('messages').innerHTML = filtered.map(m => {
     const isOwn = m.user === myUsername;
+    const isEdited = m.hasOwnProperty('edited') ? m.edited : false;
+    const hasReply = m.hasOwnProperty('replyTo') ? m.replyTo : null;
     
     const canDelete = myRole === 'admin' || isOwn;
     const canEdit = isOwn;
@@ -200,7 +202,7 @@ function applyFilter() {
       </div>
     `;
 
-    const replyContextMark = m.replyTo ? `
+    const replyContextMark = hasReply ? `
       <div class="reply-box" onclick="scrollToMessage('${m.replyTo.id}')">
         <strong>@${m.replyTo.user}</strong>: ${m.replyTo.text}...
       </div>
@@ -209,7 +211,7 @@ function applyFilter() {
     return `
       <div class="msg ${isOwn ? 'own' : ''}" id="msg-${m._id}">
         <span class="msg-meta">
-          <span>${m.user}${m.role === 'admin' ? ' (Owner)' : ''}${m.edited ? ' <small style="font-style:italic;opacity:0.6;">(edited)</small>' : ''}</span>
+          <span>${m.user}${m.role === 'admin' ? ' (Owner)' : ''}${isEdited ? ' <small style="font-style:italic;opacity:0.6;">(edited)</small>' : ''}</span>
           ${actionButtons}
         </span>
         ${replyContextMark}

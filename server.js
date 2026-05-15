@@ -113,9 +113,18 @@ io.on('connection', async (socket) => {
   const lastBC = await Announcement.findOne().sort({ ts: -1 });
   socket.emit('announcement', lastBC || { msg: '', important: false });
 
-  const history = await Message.find({
+  const rawHistory = await Message.find({
     $or: [{ to: 'global' }, { to: name }, { user: name }]
   }).sort({ ts: -1 }).limit(150);
+
+  const history = rawHistory.map(doc => {
+    const m = doc.toObject();
+    return {
+      ...m,
+      replyTo: m.replyTo !== undefined ? m.replyTo : null,
+      edited: m.edited !== undefined ? m.edited : false
+    };
+  });
   
   socket.emit('welcome', { username: name, role: role, history: history.reverse() });
 
@@ -134,7 +143,8 @@ io.on('connection', async (socket) => {
       msg: cleanMsg, 
       role: role,
       to: data.to || 'global',
-      replyTo: data.replyTo || null
+      replyTo: data.replyTo || null,
+      edited: false
     }).save();
 
     if (entry.to === 'global') {
