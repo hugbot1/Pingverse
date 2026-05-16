@@ -63,6 +63,18 @@ function enterChat(token) {
   document.getElementById('chat-screen').style.display = 'flex';
   socket = io({ auth: { token } });
 
+  const msgDiv = document.getElementById('messages');
+  msgDiv.addEventListener('scroll', () => {
+    const btn = document.getElementById('scroll-bottom-btn');
+    if (btn) {
+      if (msgDiv.scrollHeight - msgDiv.scrollTop - msgDiv.clientHeight > 300) {
+        btn.style.display = 'block';
+      } else {
+        btn.style.display = 'none';
+      }
+    }
+  });
+
   socket.on('welcome', ({ username, role, history }) => { 
     myUsername = username;
     myRole = role;
@@ -86,9 +98,13 @@ function enterChat(token) {
   });
 
   socket.on('chat message', (msg) => { 
+    const msgDiv = document.getElementById('messages');
+    const isNearBottom = msgDiv.scrollHeight - msgDiv.scrollTop - msgDiv.clientHeight < 150;
     fullHistory.push(msg); 
     applyFilter();
-    scrollToBottomInstant();
+    if (isNearBottom) {
+      scrollToBottomInstant();
+    }
     if (document.hidden) {
       unreadCount++;
       document.title = `(${unreadCount}) New Messages!`;
@@ -288,7 +304,11 @@ function updateBroadcast() {
 
 function scrollToBottomInstant() {
   const m = document.getElementById('messages');
-  requestAnimationFrame(() => m.scrollTop = m.scrollHeight);
+  requestAnimationFrame(() => {
+    m.scrollTop = m.scrollHeight;
+    const btn = document.getElementById('scroll-bottom-btn');
+    if (btn) btn.style.display = 'none';
+  });
 }
 
 function toggleSearch() { 
