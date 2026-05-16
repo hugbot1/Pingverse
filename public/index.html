@@ -169,6 +169,7 @@
   <div class="sidebar">
     <div class="sidebar-header"><input id="user-search" placeholder="Search people..." oninput="filterUsers()"></div>
     <div id="user-list" class="user-list"></div>
+    <span class="settings-trigger-label">Click on a user to dm them</span>
     
     <div id="admin-tools">
       <p style="font-size:0.65rem; color:var(--accent); margin-bottom:8px; font-weight:bold;">Set News</p>
@@ -178,7 +179,7 @@
     </div>
 
     <div class="sidebar-footer">
-      <div class="profile-section" onclick="openSettings()" title="Open Account Settings">
+      <div class="profile-section" onclick="openSettings()" title="Manage Account">
         <div class="profile-info">
           <span class="settings-trigger-label">My Account</span>
           <span id="user-badge" style="color:var(--accent); font-weight: bold; font-size: 0.9rem;">...</span>
