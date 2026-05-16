@@ -35,7 +35,8 @@ const Message = mongoose.model('Message', new mongoose.Schema({
   to: { type: String, default: 'global' },
   replyTo: { type: Object, default: null },
   edited: { type: Boolean, default: false },
-  ts: { type: Date, default: Date.now }
+  ts: { type: Date, default: Date.now },
+  read: { type: Boolean, default: false }
 }));
 
 const Announcement = mongoose.model('Announcement', new mongoose.Schema({
@@ -123,7 +124,8 @@ io.on('connection', async (socket) => {
       ...m,
       to: m.to !== undefined ? m.to : 'global',
       replyTo: m.replyTo !== undefined ? m.replyTo : null,
-      edited: m.edited !== undefined ? m.edited : false
+      edited: m.edited !== undefined ? m.edited : false,
+      read: m.read !== undefined ? m.read : false
     };
   });
   
@@ -145,7 +147,8 @@ io.on('connection', async (socket) => {
       role: role,
       to: data.to || 'global',
       replyTo: data.replyTo || null,
-      edited: false
+      edited: false,
+      read: false
     }).save();
 
     if (entry.to === 'global') {
@@ -153,8 +156,17 @@ io.on('connection', async (socket) => {
     } else {
       socket.emit('chat message', entry);
       const targetSocket = Array.from(io.sockets.sockets.values()).find(s => s.user.username === entry.to);
-      if (targetSocket) targetSocket.emit('chat message', entry);
+      if (targetSocket) {
+        targetSocket.emit('chat message', entry);
+        targetSocket.emit('user list update');
+      }
+      socket.emit('user list update');
     }
+  });
+
+  socket.on('mark read', async (senderName) => {
+    await Message.updateMany({ user: senderName, to: name, read: false }, { read: true });
+    socket.emit('status change');
   });
 
   socket.on('edit message', async ({ id, newMsg }) => {
@@ -215,11 +227,19 @@ io.on('connection', async (socket) => {
 
   socket.on('get users', async () => {
     const all = await User.find({}, 'username role mutedUntil');
+    const unreadCounts = await Message.aggregate([
+      { $match: { to: name, read: false } },
+      { $group: { _id: '$user', count: { $sum: 1 } } }
+    ]);
+    const unreadMap = {};
+    unreadCounts.forEach(item => { unreadMap[item._id] = item.count; });
+
     socket.emit('user list', all.map(u => ({ 
       name: u.username, 
       role: u.role, 
       online: onlineUsers.has(u.username),
-      isMuted: u.mutedUntil && u.mutedUntil > new Date()
+      isMuted: u.mutedUntil && u.mutedUntil > new Date(),
+      unreadCount: unreadMap[u.username] || 0
     })));
   });
 

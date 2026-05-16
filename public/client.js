@@ -100,6 +100,12 @@ function enterChat(token) {
   socket.on('chat message', (msg) => { 
     const msgDiv = document.getElementById('messages');
     const isNearBottom = msgDiv.scrollHeight - msgDiv.scrollTop - msgDiv.clientHeight < 150;
+    
+    if (activePrivateUser && msg.user === activePrivateUser && msg.to === myUsername) {
+      msg.read = true;
+      socket.emit('mark read', activePrivateUser);
+    }
+
     fullHistory.push(msg); 
     applyFilter();
     if (isNearBottom) {
@@ -109,6 +115,7 @@ function enterChat(token) {
       unreadCount++;
       document.title = `(${unreadCount}) New Messages!`;
     }
+    socket.emit('get users');
   });
 
   socket.on('msg deleted', (id) => {
@@ -147,6 +154,10 @@ function enterChat(token) {
       const muteLabel = u.isMuted ? ' <span style="color:var(--danger)">[Timed Out]</span>' : '';
       const ownerLabel = u.role === 'admin' ? ' <small style="color:var(--accent); font-weight:bold;">(Owner)</small>' : '';
       
+      const badge = (u.unreadCount && u.unreadCount > 0 && u.name !== activePrivateUser) ? `
+        <span style="background:var(--danger, #ff4d4d); color:white; border-radius:50%; padding:2px 6px; font-size:10px; font-weight:bold; margin-right:6px; display:inline-block; vertical-align:middle;">${u.unreadCount}</span>
+      ` : '';
+
       const adminActions = (myRole === 'admin' && u.name !== myUsername) ? `
         <div style="margin-top:4px; display:flex; gap:5px;">
           <button onclick="event.stopPropagation(); timeoutUser('${u.name}')" style="background:#333; font-size:10px; color:#fff; border:none; padding:2px 4px; border-radius:3px;">Timeout</button>
@@ -155,12 +166,15 @@ function enterChat(token) {
       ` : '';
 
       return `
-        <div class="user-item" onclick="startPrivate('${u.name}')">
+        <div class="user-item" onclick="startPrivate('${u.name}')" style="display:flex; justify-content:space-between; align-items:center;">
           <div>
             <span style="font-weight:500;">${u.name}</span>${ownerLabel}${muteLabel}
             ${adminActions}
           </div>
-          <div class="dot" style="background:${u.online ? 'var(--accent)' : '#444'}"></div>
+          <div style="display:flex; align-items:center;">
+            ${badge}
+            <div class="dot" style="background:${u.online ? 'var(--accent)' : '#444'}"></div>
+          </div>
         </div>
       `;
     }).join('');
@@ -172,7 +186,14 @@ function startPrivate(target) {
   activePrivateUser = target;
   document.getElementById('chat-title').innerText = `Chat with ${target}`;
   document.getElementById('back-btn').style.display = 'inline-block';
+  
+  fullHistory.forEach(m => {
+    if (m.user === target && m.to === myUsername) m.read = true;
+  });
+
+  socket.emit('mark read', target);
   applyFilter();
+  socket.emit('get users');
 }
 
 function exitPrivate() {
@@ -181,6 +202,7 @@ function exitPrivate() {
   document.getElementById('back-btn').style.display = 'none';
   applyFilter();
   scrollToBottomInstant();
+  socket.emit('get users');
 }
 
 function applyFilter() {
