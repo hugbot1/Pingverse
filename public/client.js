@@ -67,7 +67,7 @@ function enterChat(token) {
   msgDiv.addEventListener('scroll', () => {
     const btn = document.getElementById('scroll-bottom-btn');
     if (btn) {
-      if (msgDiv.scrollHeight - msgDiv.scrollTop - msgDiv.clientHeight > 300) {
+      if (msgDiv.scrollHeight - msgDiv.scrollTop - msgDiv.clientHeight > 500) {
         btn.style.display = 'block';
       } else {
         btn.style.display = 'none';
