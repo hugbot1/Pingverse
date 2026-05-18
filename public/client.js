@@ -301,40 +301,33 @@ function terminateAccount(username) {
 function openSettings() { 
   document.getElementById('settings-alert').style.display = 'none';
   const modal = document.getElementById('settings-modal');
-  modal.style.display = 'flex';
   
-  const uInput = document.getElementById('new-username');
-  const pInput = document.getElementById('new-password');
-  if (uInput) {
-    uInput.removeAttribute('disabled');
-    uInput.setAttribute('type', 'text');
+  // Inject the inputs completely fresh so the browser doesn't know they existed on load
+  const container = document.getElementById('dynamic-settings-fields');
+  if (container) {
+    container.innerHTML = `
+      <input type="text" id="new-username" placeholder="New Username (Optional)" autocomplete="off">
+      <input type="password" id="new-password" placeholder="New Password (Optional)" autocomplete="off">
+    `;
   }
-  if (pInput) {
-    pInput.removeAttribute('disabled');
-    pInput.setAttribute('type', 'password');
-  }
+  
+  modal.style.display = 'flex';
 }
 
 function closeSettings() { 
   const modal = document.getElementById('settings-modal');
-  
-  const uInput = document.getElementById('new-username');
-  const pInput = document.getElementById('new-password');
-  if (uInput) {
-    uInput.setAttribute('type', 'hidden');
-    uInput.setAttribute('disabled', 'true');
-  }
-  if (pInput) {
-    pInput.setAttribute('type', 'hidden');
-    pInput.setAttribute('disabled', 'true');
-  }
-  
   modal.style.display = 'none'; 
+  
+  // Wipe the inputs entirely out of existence so the browser drops them from memory
+  const container = document.getElementById('dynamic-settings-fields');
+  if (container) container.innerHTML = '';
 }
 
 function saveSettings() {
-  const newUser = document.getElementById('new-username').value.trim();
-  const newPass = document.getElementById('new-password').value.trim();
+  const uEl = document.getElementById('new-username');
+  const pEl = document.getElementById('new-password');
+  const newUser = uEl ? uEl.value.trim() : '';
+  const newPass = pEl ? pEl.value.trim() : '';
   if (!newUser && !newPass) return;
   socket.emit('update account', { username: newUser || null, password: newPass || null });
 }
@@ -393,16 +386,9 @@ function escapeHtml(str) {
 
 function doSignOut() { sessionStorage.clear(); location.reload(); }
 window.onload = () => { 
-  const uInput = document.getElementById('new-username');
-  const pInput = document.getElementById('new-password');
-  if (uInput) {
-    uInput.setAttribute('type', 'hidden');
-    uInput.setAttribute('disabled', 'true');
-  }
-  if (pInput) {
-    pInput.setAttribute('type', 'hidden');
-    pInput.setAttribute('disabled', 'true');
-  }
+  // Ensure the fields are wiped out on structural cold load
+  const container = document.getElementById('dynamic-settings-fields');
+  if (container) container.innerHTML = '';
 
   const t = sessionStorage.getItem('tc_token'); 
   if(t) enterChat(t); 

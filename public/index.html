@@ -141,10 +141,9 @@
   <div class="modal-content">
     <h3 style="margin-bottom:15px">Account Settings</h3>
     <div id="settings-alert" class="alert"></div>
-    <label style="font-size:0.7rem; color:var(--text-muted)">Change Username</label>
-    <input id="new-username" type="text" placeholder="New Username...">
-    <label style="font-size:0.7rem; color:var(--text-muted)">Change Password</label>
-    <input id="new-password" type="password" placeholder="New Password...">
+    
+    <div id="dynamic-settings-fields"></div>
+    
     <button class="btn" onclick="saveSettings()">Update Account</button>
     <button class="btn" style="background:var(--danger); margin-top:10px" onclick="deleteAccount()">Delete Account & Data</button>
     <button class="btn" style="background:none; border:1px solid #444; margin-top:10px" onclick="closeSettings()">Cancel</button>
