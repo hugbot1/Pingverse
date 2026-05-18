@@ -302,14 +302,33 @@ function openSettings() {
   document.getElementById('settings-alert').style.display = 'none';
   const modal = document.getElementById('settings-modal');
   modal.style.display = 'flex';
-  const inputs = modal.querySelectorAll('input');
-  inputs.forEach(i => i.removeAttribute('disabled'));
+  
+  const uInput = document.getElementById('new-username');
+  const pInput = document.getElementById('new-password');
+  if (uInput) {
+    uInput.removeAttribute('disabled');
+    uInput.setAttribute('type', 'text');
+  }
+  if (pInput) {
+    pInput.removeAttribute('disabled');
+    pInput.setAttribute('type', 'password');
+  }
 }
 
 function closeSettings() { 
   const modal = document.getElementById('settings-modal');
-  const inputs = modal.querySelectorAll('input');
-  inputs.forEach(i => i.setAttribute('disabled', 'true'));
+  
+  const uInput = document.getElementById('new-username');
+  const pInput = document.getElementById('new-password');
+  if (uInput) {
+    uInput.setAttribute('type', 'hidden');
+    uInput.setAttribute('disabled', 'true');
+  }
+  if (pInput) {
+    pInput.setAttribute('type', 'hidden');
+    pInput.setAttribute('disabled', 'true');
+  }
+  
   modal.style.display = 'none'; 
 }
 
@@ -374,11 +393,17 @@ function escapeHtml(str) {
 
 function doSignOut() { sessionStorage.clear(); location.reload(); }
 window.onload = () => { 
-  const modal = document.getElementById('settings-modal');
-  if (modal) {
-    const inputs = modal.querySelectorAll('input');
-    inputs.forEach(i => i.setAttribute('disabled', 'true'));
+  const uInput = document.getElementById('new-username');
+  const pInput = document.getElementById('new-password');
+  if (uInput) {
+    uInput.setAttribute('type', 'hidden');
+    uInput.setAttribute('disabled', 'true');
   }
+  if (pInput) {
+    pInput.setAttribute('type', 'hidden');
+    pInput.setAttribute('disabled', 'true');
+  }
+
   const t = sessionStorage.getItem('tc_token'); 
   if(t) enterChat(t); 
 };
