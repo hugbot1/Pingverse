@@ -302,7 +302,6 @@ function openSettings() {
   document.getElementById('settings-alert').style.display = 'none';
   const modal = document.getElementById('settings-modal');
   
-  // Inject the inputs completely fresh so the browser doesn't know they existed on load
   const container = document.getElementById('dynamic-settings-fields');
   if (container) {
     container.innerHTML = `
@@ -318,7 +317,6 @@ function closeSettings() {
   const modal = document.getElementById('settings-modal');
   modal.style.display = 'none'; 
   
-  // Wipe the inputs entirely out of existence so the browser drops them from memory
   const container = document.getElementById('dynamic-settings-fields');
   if (container) container.innerHTML = '';
 }
@@ -386,7 +384,6 @@ function escapeHtml(str) {
 
 function doSignOut() { sessionStorage.clear(); location.reload(); }
 window.onload = () => { 
-  // Ensure the fields are wiped out on structural cold load
   const container = document.getElementById('dynamic-settings-fields');
   if (container) container.innerHTML = '';
 
