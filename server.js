@@ -166,7 +166,7 @@ io.on('connection', async (socket) => {
 
   socket.on('clear chat history', async () => {
     if (role !== 'admin') {
-      return socket.emit('error notice', 'Access denied: Only system owners can perform a factory chat reset.');
+      return socket.emit('error notice', 'Access denied');
     }
     try {
       await Message.deleteMany({ to: 'global' });
