@@ -1,5 +1,6 @@
 let authMode = 'login', keyB64 = null, socket = null, myUsername = null, fullHistory = [], myRole = 'user';
 let unreadCount = 0;
+let authToken = null;
 const originalTitle = "TechChat";
 
 let activePrivateUser = null; 
@@ -13,6 +14,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 const switchTab = (m) => {
+  if (m !== 'login' && m !== 'register') return;
   authMode = m;
   cancelReply();
   document.getElementById('tab-login').classList.toggle('active', m==='login');
@@ -21,9 +23,10 @@ const switchTab = (m) => {
 };
 
 const handleFile = (f) => {
-  if (!f[0]) return;
+  if (!f || !f[0]) return;
   const r = new FileReader();
   r.onload = e => { 
+    if (typeof e.target.result !== 'string') return;
     const parts = e.target.result.split(',');
     if (parts.length > 1) {
       keyB64 = parts[1];
@@ -44,14 +47,14 @@ async function doAuth() {
     return;
   }
   try {
-    const res = await fetch('/auth/' + authMode, {
+    const res = await fetch('/auth/' + encodeURIComponent(authMode), {
       method: 'POST', 
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ username, password, keyFile: keyB64 })
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error);
-    sessionStorage.setItem('tc_token', data.token);
+    authToken = data.token;
     enterChat(data.token);
   } catch(e) { 
     const el = document.getElementById('auth-alert');
@@ -60,6 +63,7 @@ async function doAuth() {
 }
 
 function enterChat(token) {
+  if (!token) return;
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('chat-screen').style.display = 'flex';
   socket = io({ auth: { token } });
@@ -80,7 +84,11 @@ function enterChat(token) {
     myUsername = username;
     myRole = role;
     document.getElementById('user-badge').innerText = username + (role==='admin' ? ' (Owner)' : '');
-    if(role === 'admin') document.getElementById('admin-tools').style.display = 'block';
+    if(role === 'admin') {
+      document.getElementById('admin-tools').style.display = 'block';
+      const clearBtn = document.getElementById('admin-clear-btn');
+      if (clearBtn) clearBtn.style.display = 'inline-block';
+    }
     fullHistory = history; 
     applyFilter();
     scrollToBottomInstant();
@@ -129,6 +137,11 @@ function enterChat(token) {
     applyFilter();
   });
 
+  socket.on('chat cleared', () => {
+    fullHistory = [];
+    applyFilter();
+  });
+
   socket.on('error notice', (errorMsg) => {
     alert(errorMsg);
   });
@@ -151,34 +164,97 @@ function enterChat(token) {
   });
   
   socket.on('user list', (list) => {
-    document.getElementById('user-list').innerHTML = list.map(u => {
-      const muteLabel = u.isMuted ? ' <span style="color:var(--danger)">[Timed Out]</span>' : '';
-      const ownerLabel = u.role === 'admin' ? ' <small style="color:var(--accent); font-weight:bold;">(Owner)</small>' : '';
-      
-      const badge = (u.unreadCount && u.unreadCount > 0 && u.name !== activePrivateUser) ? `
-        <span style="background:var(--danger, #ff4d4d); color:white; border-radius:50%; padding:2px 6px; font-size:10px; font-weight:bold; margin-right:6px; display:inline-block; vertical-align:middle;">${u.unreadCount}</span>
-      ` : '';
+    const container = document.getElementById('user-list');
+    container.innerHTML = '';
+    
+    list.forEach(u => {
+      const item = document.createElement('div');
+      item.className = 'user-item';
+      item.style.display = 'flex';
+      item.style.justifyContent = 'space-between';
+      item.style.alignItems = 'center';
+      item.onclick = () => startPrivate(u.name);
 
-      const adminActions = (myRole === 'admin' && u.name !== myUsername) ? `
-        <div style="margin-top:4px; display:flex; gap:5px;">
-          <button onclick="event.stopPropagation(); timeoutUser('${u.name}')" style="background:#333; font-size:10px; color:#fff; border:none; padding:2px 4px; border-radius:3px;">Timeout</button>
-          <button onclick="event.stopPropagation(); terminateAccount('${u.name}')" style="background:var(--danger); font-size:10px; color:#fff; border:none; padding:2px 4px; border-radius:3px;">Delete Account</button>
-        </div>
-      ` : '';
+      const leftSide = document.createElement('div');
+      const nameSpan = document.createElement('span');
+      nameSpan.style.fontWeight = '500';
+      nameSpan.textContent = u.name;
+      leftSide.appendChild(nameSpan);
 
-      return `
-        <div class="user-item" onclick="startPrivate('${u.name}')" style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <span style="font-weight:500;">${u.name}</span>${ownerLabel}${muteLabel}
-            ${adminActions}
-          </div>
-          <div style="display:flex; align-items:center;">
-            ${badge}
-            <div class="dot" style="background:${u.online ? 'var(--accent)' : '#444'}"></div>
-          </div>
-        </div>
-      `;
-    }).join('');
+      if (u.role === 'admin') {
+        const ownerLabel = document.createElement('small');
+        ownerLabel.style.color = 'var(--accent)';
+        ownerLabel.style.fontWeight = 'bold';
+        ownerLabel.textContent = ' (Owner)';
+        leftSide.appendChild(ownerLabel);
+      }
+
+      if (u.isMuted) {
+        const muteLabel = document.createElement('span');
+        muteLabel.style.color = 'var(--danger)';
+        muteLabel.textContent = ' [Timed Out]';
+        leftSide.appendChild(muteLabel);
+      }
+
+      if (myRole === 'admin' && u.name !== myUsername) {
+        const adminActions = document.createElement('div');
+        adminActions.style.marginTop = '4px';
+        adminActions.style.display = 'flex';
+        adminActions.style.gap = '5px';
+
+        const tBtn = document.createElement('button');
+        tBtn.style.background = '#333';
+        tBtn.style.fontSize = '10px';
+        tBtn.style.color = '#fff';
+        tBtn.style.border = 'none';
+        tBtn.style.padding = '2px 4px';
+        tBtn.style.borderRadius = '3px';
+        tBtn.textContent = 'Timeout';
+        tBtn.onclick = (e) => { e.stopPropagation(); timeoutUser(u.name); };
+
+        const dBtn = document.createElement('button');
+        dBtn.style.background = 'var(--danger)';
+        dBtn.style.fontSize = '10px';
+        dBtn.style.color = '#fff';
+        dBtn.style.border = 'none';
+        dBtn.style.padding = '2px 4px';
+        dBtn.style.borderRadius = '3px';
+        dBtn.textContent = 'Delete Account';
+        dBtn.onclick = (e) => { e.stopPropagation(); terminateAccount(u.name); };
+
+        adminActions.appendChild(tBtn);
+        adminActions.appendChild(dBtn);
+        leftSide.appendChild(adminActions);
+      }
+
+      const rightSide = document.createElement('div');
+      rightSide.style.display = 'flex';
+      rightSide.style.alignItems = 'center';
+
+      if (u.unreadCount && u.unreadCount > 0 && u.name !== activePrivateUser) {
+        const badge = document.createElement('span');
+        badge.style.background = 'var(--danger, #ff4d4d)';
+        badge.style.color = 'white';
+        badge.style.borderRadius = '50%';
+        badge.style.padding = '2px 6px';
+        badge.style.fontSize = '10px';
+        badge.style.fontWeight = 'bold';
+        badge.style.marginRight = '6px';
+        badge.style.display = 'inline-block';
+        badge.style.verticalAlign = 'middle';
+        badge.textContent = u.unreadCount;
+        rightSide.appendChild(badge);
+      }
+
+      const dot = document.createElement('div');
+      dot.className = 'dot';
+      dot.style.background = u.online ? 'var(--accent)' : '#444';
+      rightSide.appendChild(dot);
+
+      item.appendChild(leftSide);
+      item.appendChild(rightSide);
+      container.appendChild(item);
+    });
   });
 }
 
@@ -228,7 +304,10 @@ function applyFilter() {
   if(sort === 'new') filtered.sort((a,b) => new Date(a.ts) - new Date(b.ts));
   else filtered.sort((a,b) => new Date(b.ts) - new Date(a.ts));
 
-  document.getElementById('messages').innerHTML = filtered.map(m => {
+  const container = document.getElementById('messages');
+  container.innerHTML = '';
+
+  filtered.forEach(m => {
     const isOwn = m.user === myUsername;
     const isEdited = m.hasOwnProperty('edited') ? m.edited : false;
     const hasReply = m.hasOwnProperty('replyTo') ? m.replyTo : null;
@@ -236,32 +315,82 @@ function applyFilter() {
     const canDelete = myRole === 'admin' || isOwn;
     const canEdit = isOwn;
 
-    const actionButtons = `
-      <div style="display:inline-block; margin-left:8px;">
-        ${canEdit ? `<button onclick="editMsg('${m._id}', '${escapeHtml(m.msg)}')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:0.7rem;margin-right:4px;">[Edit]</button>` : ''}
-        ${canDelete ? `<button onclick="deleteMsg('${m._id}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.7rem;">[X]</button>` : ''}
-        <button onclick="setReply('${m._id}', '${m.user}', '${escapeHtml(m.msg)}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.7rem;margin-left:4px;">[Reply]</button>
-      </div>
-    `;
+    const msgElement = document.createElement('div');
+    msgElement.className = `msg ${isOwn ? 'own' : ''}`;
+    msgElement.id = `msg-${m._id}`;
 
-    const replyContextMark = hasReply ? `
-      <div class="reply-box" onclick="scrollToMessage('${m.replyTo.id}')">
-        <strong>@${m.replyTo.user}</strong>: ${m.replyTo.text}...
-      </div>
-    ` : '';
+    const metaSpan = document.createElement('span');
+    metaSpan.className = 'msg-meta';
 
-    return `
-      <div class="msg ${isOwn ? 'own' : ''}" id="msg-${m._id}">
-        <span class="msg-meta">
-          <span>${m.user}${m.role === 'admin' ? ' (Owner)' : ''}${isEdited ? ' <small style="font-style:italic;opacity:0.6;">(edited)</small>' : ''}</span>
-          ${actionButtons}
-        </span>
-        ${replyContextMark}
-        <span class="msg-content">${escapeHtml(m.msg)}</span>
-        <div class="msg-time">${new Date(m.ts).toLocaleString([], {month:'numeric', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'})}</div>
-      </div>
-    `;
-  }).join('');
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = m.user + (m.role === 'admin' ? ' (Owner)' : '');
+    if (isEdited) {
+      const ed = document.createElement('small');
+      ed.style.fontStyle = 'italic';
+      ed.style.opacity = '0.6';
+      ed.textContent = ' (edited)';
+      labelSpan.appendChild(ed);
+    }
+    metaSpan.appendChild(labelSpan);
+
+    const actionDiv = document.createElement('div');
+    actionDiv.style.display = 'inline-block';
+    actionDiv.style.marginLeft = '8px';
+
+    if (canEdit) {
+      const eBtn = document.createElement('button');
+      eBtn.style.background = 'none'; eBtn.style.border = 'none'; eBtn.style.color = 'var(--accent)';
+      eBtn.style.cursor = 'pointer'; eBtn.style.fontSize = '0.7rem'; eBtn.style.marginRight = '4px';
+      eBtn.textContent = '[Edit]';
+      eBtn.onclick = () => editMsg(m._id, m.msg);
+      actionDiv.appendChild(eBtn);
+    }
+
+    if (canDelete) {
+      const dBtn = document.createElement('button');
+      dBtn.style.background = 'none'; dBtn.style.border = 'none'; dBtn.style.color = 'var(--danger)';
+      dBtn.style.cursor = 'pointer'; dBtn.style.fontSize = '0.7rem';
+      dBtn.textContent = '[X]';
+      dBtn.onclick = () => deleteMsg(m._id);
+      actionDiv.appendChild(dBtn);
+    }
+
+    const rBtn = document.createElement('button');
+    rBtn.style.background = 'none'; rBtn.style.border = 'none'; rBtn.style.color = 'var(--text-muted)';
+    rBtn.style.cursor = 'pointer'; rBtn.style.fontSize = '0.7rem'; rBtn.style.marginLeft = '4px';
+    rBtn.textContent = '[Reply]';
+    rBtn.onclick = () => setReply(m._id, m.user, m.msg);
+    actionDiv.appendChild(rBtn);
+
+    metaSpan.appendChild(actionDiv);
+    msgElement.appendChild(metaSpan);
+
+    if (hasReply) {
+      const rBox = document.createElement('div');
+      rBox.className = 'reply-box';
+      rBox.onclick = () => scrollToMessage(m.replyTo.id);
+      
+      const strUser = document.createElement('strong');
+      strUser.textContent = `@${m.replyTo.user}`;
+      rBox.appendChild(strUser);
+      
+      const rText = document.createTextNode(`: ${m.replyTo.text}...`);
+      rBox.appendChild(rText);
+      msgElement.appendChild(rBox);
+    }
+
+    const contentSpan = document.createElement('span');
+    contentSpan.className = 'msg-content';
+    contentSpan.textContent = m.msg;
+    msgElement.appendChild(contentSpan);
+
+    const timeDiv = document.createElement('div');
+    timeDiv.className = 'msg-time';
+    timeDiv.textContent = new Date(m.ts).toLocaleString([], {month:'numeric', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'});
+    msgElement.appendChild(timeDiv);
+
+    container.appendChild(msgElement);
+  });
 }
 
 function deleteMsg(id) { if(confirm("Delete this message?")) socket.emit('delete message', id); }
@@ -270,6 +399,12 @@ function editMsg(id, oldText) {
   const newMsg = prompt("Edit your message:", oldText);
   if (newMsg !== null && newMsg.trim() !== "") {
     socket.emit('edit message', { id, newMsg: newMsg.trim() });
+  }
+}
+
+function clearChat() {
+  if (confirm("Are you sure you want to completely erase the global chat history for everyone?")) {
+    socket.emit('clear chat history');
   }
 }
 
@@ -292,7 +427,10 @@ function scrollToMessage(id) {
 
 function timeoutUser(username) {
   const mins = prompt(`Timeout ${username} for how many minutes?`, "10");
-  if (mins) socket.emit('timeout user', { target: username, mins: parseInt(mins, 10) });
+  if (mins) {
+    const parseMins = parseInt(mins, 10);
+    if(!isNaN(parseMins)) socket.emit('timeout user', { target: username, mins: parseMins });
+  }
 }
 
 function terminateAccount(username) {
@@ -307,10 +445,13 @@ function openSettings() {
   
   const container = document.getElementById('dynamic-settings-fields');
   if (container) {
-    container.innerHTML = `
-      <input type="text" id="new-username" placeholder="New Username (Optional)" autocomplete="off">
-      <input type="password" id="new-password" placeholder="New Password (Optional)" autocomplete="off">
-    `;
+    container.innerHTML = '';
+    const uInput = document.createElement('input');
+    uInput.type = 'text'; uInput.id = 'new-username'; uInput.placeholder = 'New Username (Optional)'; uInput.autocomplete = 'off';
+    const pInput = document.createElement('input');
+    pInput.type = 'password'; pInput.id = 'new-password'; pInput.placeholder = 'New Password (Optional)'; pInput.autocomplete = 'off';
+    container.appendChild(uInput);
+    container.appendChild(pInput);
   }
   
   modal.style.display = 'flex';
@@ -362,7 +503,7 @@ function toggleSearch() {
 function filterUsers() {
   const q = document.getElementById('user-search').value.toLowerCase();
   document.querySelectorAll('.user-item').forEach(i => {
-    i.style.display = i.innerText.toLowerCase().includes(q) ? 'flex' : 'none';
+    i.style.display = i.textContent.toLowerCase().includes(q) ? 'flex' : 'none';
   });
 }
 
@@ -381,15 +522,8 @@ function doSend() {
   cancelReply();
 }
 
-function escapeHtml(str) {
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-}
-
-function doSignOut() { sessionStorage.clear(); location.reload(); }
+function doSignOut() { authToken = null; location.reload(); }
 window.onload = () => { 
   const container = document.getElementById('dynamic-settings-fields');
   if (container) container.innerHTML = '';
-
-  const t = sessionStorage.getItem('tc_token'); 
-  if(t) enterChat(t); 
 };
