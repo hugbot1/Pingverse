@@ -300,10 +300,18 @@ function terminateAccount(username) {
 
 function openSettings() { 
   document.getElementById('settings-alert').style.display = 'none';
-  document.getElementById('settings-modal').style.display = 'flex'; 
+  const modal = document.getElementById('settings-modal');
+  modal.style.display = 'flex';
+  const inputs = modal.querySelectorAll('input');
+  inputs.forEach(i => i.removeAttribute('disabled'));
 }
 
-function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+function closeSettings() { 
+  const modal = document.getElementById('settings-modal');
+  const inputs = modal.querySelectorAll('input');
+  inputs.forEach(i => i.setAttribute('disabled', 'true'));
+  modal.style.display = 'none'; 
+}
 
 function saveSettings() {
   const newUser = document.getElementById('new-username').value.trim();
@@ -365,4 +373,12 @@ function escapeHtml(str) {
 }
 
 function doSignOut() { sessionStorage.clear(); location.reload(); }
-window.onload = () => { const t = sessionStorage.getItem('tc_token'); if(t) enterChat(t); };
+window.onload = () => { 
+  const modal = document.getElementById('settings-modal');
+  if (modal) {
+    const inputs = modal.querySelectorAll('input');
+    inputs.forEach(i => i.setAttribute('disabled', 'true'));
+  }
+  const t = sessionStorage.getItem('tc_token'); 
+  if(t) enterChat(t); 
+};
