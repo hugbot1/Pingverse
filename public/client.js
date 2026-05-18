@@ -137,7 +137,7 @@ function enterChat(token) {
   });
 
   socket.on('chat cleared', () => {
-    fullHistory = [];
+    fullHistory = fullHistory.filter(m => m.to !== 'global' && m.to !== undefined);
     applyFilter();
   });
 

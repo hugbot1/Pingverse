@@ -164,7 +164,6 @@ io.on('connection', async (socket) => {
     }
   });
 
-  // Wipes all global chat logs for everyone if triggered by an admin
   socket.on('clear chat history', async () => {
     if (role !== 'admin') {
       return socket.emit('error notice', 'Access denied: Only system owners can perform a factory chat reset.');
