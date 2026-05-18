@@ -258,7 +258,7 @@ function applyFilter() {
         </span>
         ${replyContextMark}
         <span class="msg-content">${escapeHtml(m.msg)}</span>
-        <div class="msg-time">${new Date(m.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
+        <div class="msg-time">${new Date(m.ts).toLocaleString([], {month:'numeric', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'})}</div>
       </div>
     `;
   }).join('');
