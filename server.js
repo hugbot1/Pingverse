@@ -164,6 +164,19 @@ io.on('connection', async (socket) => {
     }
   });
 
+  // Wipes all global chat logs for everyone if triggered by an admin
+  socket.on('clear chat history', async () => {
+    if (role !== 'admin') {
+      return socket.emit('error notice', 'Access denied: Only system owners can perform a factory chat reset.');
+    }
+    try {
+      await Message.deleteMany({ to: 'global' });
+      io.emit('chat cleared');
+    } catch (err) {
+      socket.emit('error notice', 'Failed to purge database records.');
+    }
+  });
+
   socket.on('mark read', async (senderName) => {
     await Message.updateMany({ user: senderName, to: name, read: false }, { read: true });
     socket.emit('status change');
