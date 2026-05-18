@@ -83,14 +83,12 @@ function enterChat(token) {
     myUsername = username;
     myRole = role;
     
-    // Explicitly enforce hard-hiding of admin panel components on initialization
     document.getElementById('admin-tools').style.display = 'none';
     const clearBtn = document.getElementById('admin-clear-btn');
     if (clearBtn) clearBtn.style.display = 'none';
 
     document.getElementById('user-badge').innerText = username + (role==='admin' ? ' (Owner)' : '');
     
-    // Only toggle interface elements visibility if verified by the runtime state
     if(role === 'admin') {
       document.getElementById('admin-tools').style.display = 'block';
       if (clearBtn) clearBtn.style.display = 'inline-block';
