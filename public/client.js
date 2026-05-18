@@ -14,6 +14,7 @@ document.addEventListener('visibilitychange', () => {
 
 const switchTab = (m) => {
   authMode = m;
+  cancelReply();
   document.getElementById('tab-login').classList.toggle('active', m==='login');
   document.getElementById('tab-register').classList.toggle('active', m==='register');
   document.getElementById('auth-btn').innerText = m==='login' ? 'Sign In' : 'Create Account';
@@ -183,6 +184,7 @@ function enterChat(token) {
 
 function startPrivate(target) {
   if (target === myUsername) return;
+  cancelReply();
   activePrivateUser = target;
   document.getElementById('chat-title').innerText = `Chat with ${target}`;
   document.getElementById('back-btn').style.display = 'inline-block';
@@ -197,6 +199,7 @@ function startPrivate(target) {
 }
 
 function exitPrivate() {
+  cancelReply();
   activePrivateUser = null;
   document.getElementById('chat-title').innerText = "Chat";
   document.getElementById('back-btn').style.display = 'none';
