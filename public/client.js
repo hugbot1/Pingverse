@@ -267,7 +267,7 @@ function startPrivate(target) {
   if (target === myUsername) return;
   cancelReply();
   activePrivateUser = target;
-  document.getElementById('chat-title').innerText = `Chat with ${target}`;
+  document.getElementById('chat-title').innerText = `Pingverse Chat with ${target}`;
   document.getElementById('back-btn').style.display = 'inline-block';
   
   fullHistory.forEach(m => {
