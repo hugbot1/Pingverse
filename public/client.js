@@ -1,6 +1,6 @@
 let authMode = 'login', keyB64 = null, socket = null, myUsername = null, fullHistory = [], myRole = 'user';
 let unreadCount = 0;
-const originalTitle = "TechChat";
+const originalTitle = "Pingverse";
 
 let activePrivateUser = null; 
 let replyContext = null;      
