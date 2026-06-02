@@ -38,10 +38,28 @@
   .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-left: 10px; }
   
   .main-chat { flex: 1; display: flex; flex-direction: column; position: relative; background: var(--bg); }
-  .chat-header { padding: 15px 20px; background: var(--sidebar); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #222; height: 60px; }
+  .chat-header { position: relative; padding: 15px 20px; background: var(--sidebar); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #222; height: 60px; }
   
-  .chat-header button { transition: all 0.2s ease; }
+  .chat-header button { transition: all 0.2s ease; z-index: 2; }
   .chat-header button:hover { background: rgba(0, 168, 132, 0.1) !important; }
+
+  /* Centered Logo container rules */
+  .logo-container {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none; /* Keeps background clickable if needed */
+    z-index: 1;
+  }
+  .logo-img {
+    max-height: 40px;
+    width: auto;
+    object-fit: contain;
+  }
 
   #broadcast-bar { padding: 8px; background: #2a3338; text-align: center; font-weight: bold; font-size: 0.8rem; border-bottom: 1px solid #444; display: none; }
   @keyframes flash-red { 0%, 100% { background: #2a3338; } 50% { background: var(--danger); } }
@@ -185,10 +203,15 @@
 
   <div class="main-chat">
     <div class="chat-header">
-      <div style="display:flex; align-items:center">
+      <div style="display:flex; align-items:center; z-index: 2;">
         <button id="back-btn" onclick="exitPrivate()">Return</button>
         <span id="chat-title">Pingverse Chat</span>
       </div>
+      
+      <div class="logo-container">
+        <img src="./assets/Logo.png" alt="Logo" class="logo-img" id="header-logo">
+      </div>
+
       <button onclick="toggleSearch()" style="background:none; border:1px solid var(--accent); color:var(--accent); padding:4px 8px; border-radius:4px; cursor:pointer">Search</button>
     </div>
     
