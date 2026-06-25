@@ -2,8 +2,8 @@ let authMode = 'login', keyB64 = null, socket = null, myUsername = null, fullHis
 let unreadCount = 0;
 const originalTitle = "Pingverse";
 
-let activePrivateUser = null; 
-let replyContext = null;      
+let activePrivateUser = null;
+let replyContext = null;
 
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
@@ -16,15 +16,15 @@ const switchTab = (m) => {
   if (m !== 'login' && m !== 'register') return;
   authMode = m;
   cancelReply();
-  document.getElementById('tab-login').classList.toggle('active', m==='login');
-  document.getElementById('tab-register').classList.toggle('active', m==='register');
-  document.getElementById('auth-btn').innerText = m==='login' ? 'Sign In' : 'Create Account';
+  document.getElementById('tab-login').classList.toggle('active', m === 'login');
+  document.getElementById('tab-register').classList.toggle('active', m === 'register');
+  document.getElementById('auth-btn').innerText = m === 'login' ? 'Sign In' : 'Create Account';
 };
 
 const handleFile = (f) => {
   if (!f || !f[0]) return;
   const r = new FileReader();
-  r.onload = e => { 
+  r.onload = e => {
     if (typeof e.target.result !== 'string') return;
     const parts = e.target.result.split(',');
     if (parts.length > 1) {
@@ -39,7 +39,7 @@ const handleFile = (f) => {
 async function doAuth() {
   const username = document.getElementById('f-username').value;
   const password = document.getElementById('f-password').value;
-  if(!username || !password || !keyB64) {
+  if (!username || !password || !keyB64) {
     const el = document.getElementById('auth-alert');
     el.innerText = "All fields and the Security Key are required.";
     el.style.display = 'block';
@@ -47,17 +47,17 @@ async function doAuth() {
   }
   try {
     const res = await fetch('/auth/' + encodeURIComponent(authMode), {
-      method: 'POST', 
-      headers: {'Content-Type': 'application/json'},
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password, keyFile: keyB64 })
     });
     const data = await res.json();
-    if(!res.ok) throw new Error(data.error);
+    if (!res.ok) throw new Error(data.error);
     sessionStorage.setItem('tc_token', data.token);
     enterChat(data.token);
-  } catch(e) { 
+  } catch (e) {
     const el = document.getElementById('auth-alert');
-    el.innerText = e.message; el.style.display = 'block'; 
+    el.innerText = e.message; el.style.display = 'block';
   }
 }
 
@@ -79,22 +79,22 @@ function enterChat(token) {
     }
   });
 
-  socket.on('welcome', ({ username, role, history }) => { 
+  socket.on('welcome', ({ username, role, history }) => {
     myUsername = username;
     myRole = role;
-    
+
     document.getElementById('admin-tools').style.display = 'none';
     const clearBtn = document.getElementById('admin-clear-btn');
     if (clearBtn) clearBtn.style.display = 'none';
 
-    document.getElementById('user-badge').innerText = username + (role==='admin' ? ' (Owner)' : '');
-    
-    if(role === 'admin') {
+    document.getElementById('user-badge').innerText = username + (role === 'admin' ? ' (Owner)' : '');
+
+    if (role === 'admin') {
       document.getElementById('admin-tools').style.display = 'block';
       if (clearBtn) clearBtn.style.display = 'inline-block';
     }
-    
-    fullHistory = history; 
+
+    fullHistory = history;
     applyFilter();
     scrollToBottomInstant();
     socket.emit('get users');
@@ -102,25 +102,25 @@ function enterChat(token) {
 
   socket.on('announcement', (data) => {
     const bar = document.getElementById('broadcast-bar');
-    if(!data.msg) { bar.style.display = 'none'; return; }
+    if (!data.msg) { bar.style.display = 'none'; return; }
     bar.style.display = 'block';
     document.getElementById('bc-text').innerText = data.msg;
-    if(data.important) {
+    if (data.important) {
       bar.classList.add('important-flash');
       setTimeout(() => bar.classList.remove('important-flash'), 5000);
     }
   });
 
-  socket.on('chat message', (msg) => { 
+  socket.on('chat message', (msg) => {
     const msgDiv = document.getElementById('messages');
     const isNearBottom = msgDiv.scrollHeight - msgDiv.scrollTop - msgDiv.clientHeight < 150;
-    
+
     if (activePrivateUser && msg.user === activePrivateUser && msg.to === myUsername) {
       msg.read = true;
       socket.emit('mark read', activePrivateUser);
     }
 
-    fullHistory.push(msg); 
+    fullHistory.push(msg);
     applyFilter();
     if (isNearBottom) {
       scrollToBottomInstant();
@@ -152,7 +152,7 @@ function enterChat(token) {
   });
 
   socket.on('user status alert', ({ target, muted, until }) => {
-    if(target === myUsername && muted) {
+    if (target === myUsername && muted) {
       alert(`You have been timed out until: ${new Date(until).toLocaleTimeString()}`);
     }
     socket.emit('get users');
@@ -167,11 +167,11 @@ function enterChat(token) {
     const el = document.getElementById('settings-alert');
     el.innerText = msg; el.style.display = 'block';
   });
-  
+
   socket.on('user list', (list) => {
     const container = document.getElementById('user-list');
     container.innerHTML = '';
-    
+
     list.forEach(u => {
       const item = document.createElement('div');
       item.className = 'user-item';
@@ -269,7 +269,7 @@ function startPrivate(target) {
   activePrivateUser = target;
   document.getElementById('chat-title').innerText = `${target}`;
   document.getElementById('back-btn').style.display = 'inline-block';
-  
+
   fullHistory.forEach(m => {
     if (m.user === target && m.to === myUsername) m.read = true;
   });
@@ -305,9 +305,9 @@ function applyFilter() {
   });
 
   filtered = filtered.filter(m => m.msg && m.msg.toLowerCase().includes(query) && m.user && m.user.toLowerCase().includes(userQ));
-  
-  if(sort === 'new') filtered.sort((a,b) => new Date(a.ts) - new Date(b.ts));
-  else filtered.sort((a,b) => new Date(b.ts) - new Date(a.ts));
+
+  if (sort === 'new') filtered.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+  else filtered.sort((a, b) => new Date(b.ts) - new Date(a.ts));
 
   const container = document.getElementById('messages');
   container.innerHTML = '';
@@ -316,7 +316,7 @@ function applyFilter() {
     const isOwn = m.user === myUsername;
     const isEdited = m.hasOwnProperty('edited') ? m.edited : false;
     const hasReply = m.hasOwnProperty('replyTo') ? m.replyTo : null;
-    
+
     const canDelete = myRole === 'admin' || isOwn;
     const canEdit = isOwn;
 
@@ -374,11 +374,11 @@ function applyFilter() {
       const rBox = document.createElement('div');
       rBox.className = 'reply-box';
       rBox.onclick = () => scrollToMessage(m.replyTo.id);
-      
+
       const strUser = document.createElement('strong');
       strUser.textContent = `@${m.replyTo.user}`;
       rBox.appendChild(strUser);
-      
+
       const rText = document.createTextNode(`: ${m.replyTo.text}...`);
       rBox.appendChild(rText);
       msgElement.appendChild(rBox);
@@ -391,14 +391,14 @@ function applyFilter() {
 
     const timeDiv = document.createElement('div');
     timeDiv.className = 'msg-time';
-    timeDiv.textContent = new Date(m.ts).toLocaleString([], {month:'numeric', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'});
+    timeDiv.textContent = new Date(m.ts).toLocaleString([], { month: 'numeric', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     msgElement.appendChild(timeDiv);
 
     container.appendChild(msgElement);
   });
 }
 
-function deleteMsg(id) { if(confirm("Delete this message?")) socket.emit('delete message', id); }
+function deleteMsg(id) { if (confirm("Delete this message?")) socket.emit('delete message', id); }
 
 function editMsg(id, oldText) {
   const newMsg = prompt("Edit your message:", oldText);
@@ -427,14 +427,14 @@ function cancelReply() {
 
 function scrollToMessage(id) {
   const el = document.getElementById(`msg-${id}`);
-  if(el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function timeoutUser(username) {
   const mins = prompt(`Timeout ${username} for how many minutes?`, "10");
   if (mins) {
     const parseMins = parseInt(mins, 10);
-    if(!isNaN(parseMins)) socket.emit('timeout user', { target: username, mins: parseMins });
+    if (!isNaN(parseMins)) socket.emit('timeout user', { target: username, mins: parseMins });
   }
 }
 
@@ -444,10 +444,10 @@ function terminateAccount(username) {
   }
 }
 
-function openSettings() { 
+function openSettings() {
   document.getElementById('settings-alert').style.display = 'none';
   const modal = document.getElementById('settings-modal');
-  
+
   const container = document.getElementById('dynamic-settings-fields');
   if (container) {
     container.innerHTML = '';
@@ -458,14 +458,14 @@ function openSettings() {
     container.appendChild(uInput);
     container.appendChild(pInput);
   }
-  
+
   modal.style.display = 'flex';
 }
 
-function closeSettings() { 
+function closeSettings() {
   const modal = document.getElementById('settings-modal');
-  modal.style.display = 'none'; 
-  
+  modal.style.display = 'none';
+
   const container = document.getElementById('dynamic-settings-fields');
   if (container) container.innerHTML = '';
 }
@@ -500,7 +500,7 @@ function scrollToBottomInstant() {
   });
 }
 
-function toggleSearch() { 
+function toggleSearch() {
   const p = document.getElementById('search-panel');
   p.style.display = p.style.display === 'none' ? 'flex' : 'none';
 }
@@ -514,7 +514,7 @@ function filterUsers() {
 
 function doSend() {
   const i = document.getElementById('msg-input');
-  if(!i.value.trim()) return;
+  if (!i.value.trim()) return;
 
   const data = {
     msg: i.value,
@@ -528,10 +528,10 @@ function doSend() {
 }
 
 function doSignOut() { sessionStorage.clear(); location.reload(); }
-window.onload = () => { 
+window.onload = () => {
   const container = document.getElementById('dynamic-settings-fields');
   if (container) container.innerHTML = '';
 
-  const t = sessionStorage.getItem('tc_token'); 
-  if(t) enterChat(t); 
+  const t = sessionStorage.getItem('tc_token');
+  if (t) enterChat(t);
 };

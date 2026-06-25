@@ -1,14 +1,14 @@
-const crypto  = require('crypto');
+const crypto = require('crypto');
 const express = require('express');
-const http    = require('http');
-const bcrypt  = require('bcryptjs');
-const jwt     = require('jsonwebtoken');
-const helmet  = require('helmet');
+const http = require('http');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const helmet = require('helmet');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const rateLimit = require('express-rate-limit');
 
-const app    = express();
+const app = express();
 const server = http.createServer(app);
 
 const MONGO_URI = process.env.DATABASE_URL;
@@ -25,7 +25,7 @@ const User = mongoose.model('User', new mongoose.Schema({
   username: { type: String, unique: true, required: true },
   hash: { type: String, required: true },
   role: { type: String, default: 'user' },
-  mutedUntil: { type: Date, default: null } 
+  mutedUntil: { type: Date, default: null }
 }));
 
 const Message = mongoose.model('Message', new mongoose.Schema({
@@ -49,9 +49,9 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc:  ["'self'", "'unsafe-inline'", "https://cdn.socket.io"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.socket.io"],
       scriptSrcAttr: ["'unsafe-inline'"],
-      styleSrc:   ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
       connectSrc: ["'self'"],
     },
   },
@@ -128,7 +128,7 @@ io.on('connection', async (socket) => {
       read: m.read !== undefined ? m.read : false
     };
   });
-  
+
   socket.emit('welcome', { username: name, role: role, history: history.reverse() });
 
   socket.on('chat message', async (data) => {
@@ -141,9 +141,9 @@ io.on('connection', async (socket) => {
     const cleanMsg = msgContent.trim().substring(0, 500);
     if (!cleanMsg) return;
 
-    const entry = await new Message({ 
-      user: name, 
-      msg: cleanMsg, 
+    const entry = await new Message({
+      user: name,
+      msg: cleanMsg,
       role: role,
       to: data.to || 'global',
       replyTo: data.replyTo || null,
@@ -206,7 +206,7 @@ io.on('connection', async (socket) => {
       updates.username = data.username;
     }
     if (data.password) updates.hash = await bcrypt.hash(data.password, 10);
-    
+
     await User.findOneAndUpdate({ username: name }, updates);
     if (updates.username) await Message.updateMany({ user: name }, { user: updates.username });
     socket.emit('settings success', 'Updated. Re-logging...');
@@ -246,9 +246,9 @@ io.on('connection', async (socket) => {
     const unreadMap = {};
     unreadCounts.forEach(item => { unreadMap[item._id] = item.count; });
 
-    socket.emit('user list', all.map(u => ({ 
-      name: u.username, 
-      role: u.role, 
+    socket.emit('user list', all.map(u => ({
+      name: u.username,
+      role: u.role,
       online: onlineUsers.has(u.username),
       isMuted: u.mutedUntil && u.mutedUntil > new Date(),
       unreadCount: unreadMap[u.username] || 0
