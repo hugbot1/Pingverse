@@ -213,7 +213,7 @@ select {
 #admin-tools {
     display: none;
     padding: 15px;
-    background: #111416;
+    background: var(--sidebar);
     border-top: 1px solid #222;
     border-bottom: 1px solid #222;
 }
@@ -379,7 +379,7 @@ select {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #1e2327;
+    background: var(--sidebar);
     padding: 10px 14px;
     border-radius: 8px;
     border: 1px solid #2a3338;
