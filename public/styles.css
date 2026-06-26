@@ -369,7 +369,7 @@ select {
 .sidebar-footer {
     padding: 12px 15px;
     border-top: 1px solid #222;
-    background: var(--sidebar);
+    background: var(--cards);
     display: flex;
     flex-direction: column;
     gap: 10px;
