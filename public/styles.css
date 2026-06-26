@@ -144,7 +144,7 @@ select {
 }
 
 .user-item:hover {
-    background: #141618;
+    background: var(--accent);
 }
 
 .dot {
