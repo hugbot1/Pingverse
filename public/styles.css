@@ -56,6 +56,11 @@ body {
     border-radius: 6px 6px 0 0;
 }
 
+.tab:hover {
+    background: rgba(0, 168, 132, 0.1);
+    color: var(--text);
+}
+
 .tab.active {
     color: var(--accent);
     border-bottom: 2px solid var(--accent);
@@ -82,6 +87,10 @@ select {
     font-weight: bold;
     border-radius: 6px;
     cursor: pointer;
+}
+
+.btn:hover {
+    background: #009675;
 }
 
 .key-zone {
@@ -131,6 +140,10 @@ select {
     justify-content: space-between;
     align-items: center;
     cursor: pointer;
+}
+
+.user-item:hover {
+    background: #2a3338;
 }
 
 .dot {
@@ -385,6 +398,11 @@ select {
     cursor: pointer;
 }
 
+.profile-section:hover {
+    border-color: var(--accent);
+    background: #2a3338;
+}
+
 .profile-info {
     display: flex;
     flex-direction: column;
@@ -404,6 +422,10 @@ select {
 .gear-icon {
     font-size: 1.1rem;
     color: var(--text-muted);
+}
+
+.profile-section:hover .gear-icon {
+    color: var(--accent);
 }
 
 .logout-row {
