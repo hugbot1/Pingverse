@@ -6,7 +6,6 @@
         --text: #e9edef;
         --text-muted: #8696a0;
         --accent: #6fa74a;
-        --own-msg: #141412;
         --danger: #f15c5c;
     }
 
@@ -287,7 +286,7 @@
 
     .msg.own {
         align-self: flex-end;
-        background: var(--own-msg);
+        background: var(--cards);
     }
 
     .msg-content {
