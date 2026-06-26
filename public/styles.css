@@ -366,19 +366,6 @@ select {
     display: none;
 }
 
-#back-btn {
-    display: none;
-    background: none;
-    border: 1px solid var(--accent);
-    color: var(--accent);
-    padding: 5px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    margin-right: 12px;
-    font-size: 0.8rem;
-    font-weight: bold;
-}
-
 .sidebar-footer {
     padding: 12px 15px;
     border-top: 1px solid #222;
