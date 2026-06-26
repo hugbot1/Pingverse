@@ -369,7 +369,7 @@ select {
 .sidebar-footer {
     padding: 12px 15px;
     border-top: 1px solid #222;
-    background: var(--cards);
+    background: var(--sidebar);
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -379,7 +379,7 @@ select {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #1e2327;
+    background: #505050;
     padding: 10px 14px;
     border-radius: 8px;
     border: 1px solid #2a3338;
