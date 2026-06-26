@@ -6,6 +6,7 @@
     --text: #e9edef;
     --text-muted: #8696a0;
     --accent: #6fa74a;
+    --accent-hover: #588838;
     --danger: #f15c5c;
 }
 
@@ -90,7 +91,7 @@ select {
 }
 
 .btn:hover {
-    background: #009675;
+    background: var(--accent-hover);
 }
 
 .key-zone {
@@ -178,7 +179,7 @@ select {
 }
 
 .chat-header button:hover {
-    background: rgba(0, 168, 132, 0.1) !important;
+    background: var(--accent-hover);
 }
 
 .logo-container {
