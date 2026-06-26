@@ -280,7 +280,7 @@
         padding: 10px 14px;
         border-radius: 8px;
         max-width: 75%;
-        background: var(--surface);
+        background: var(--cards);
         align-self: flex-start;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
     }
