@@ -36,7 +36,8 @@ const Message = mongoose.model('Message', new mongoose.Schema({
   replyTo: { type: Object, default: null },
   edited: { type: Boolean, default: false },
   ts: { type: Date, default: Date.now },
-  read: { type: Boolean, default: false }
+  read: { type: Boolean, default: false },
+  yeahs: { type: [String], default: [] }
 }));
 
 const Announcement = mongoose.model('Announcement', new mongoose.Schema({
@@ -125,7 +126,8 @@ io.on('connection', async (socket) => {
       to: m.to !== undefined ? m.to : 'global',
       replyTo: m.replyTo !== undefined ? m.replyTo : null,
       edited: m.edited !== undefined ? m.edited : false,
-      read: m.read !== undefined ? m.read : false
+      read: m.read !== undefined ? m.read : false,
+      yeahs: m.yeahs !== undefined ? m.yeahs : []
     };
   });
 
@@ -148,7 +150,8 @@ io.on('connection', async (socket) => {
       to: data.to || 'global',
       replyTo: data.replyTo || null,
       edited: false,
-      read: false
+      read: false,
+      yeahs: []
     }).save();
 
     if (entry.to === 'global') {
@@ -161,6 +164,32 @@ io.on('connection', async (socket) => {
         targetSocket.emit('user list update');
       }
       socket.emit('user list update');
+    }
+  });
+
+  socket.on('toggle yeah', async (msgId) => {
+    try {
+      const msg = await Message.findById(msgId);
+      if (!msg) return;
+      if (!msg.yeahs) msg.yeahs = [];
+      const index = msg.yeahs.indexOf(name);
+      if (index === -1) {
+        msg.yeahs.push(name);
+      } else {
+        msg.yeahs.splice(index, 1);
+      }
+      await msg.save();
+      if (msg.to === 'global') {
+        io.emit('msg updated', msg);
+      } else {
+        socket.emit('msg updated', msg);
+        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => s.user.username === msg.to);
+        if (targetSocket) targetSocket.emit('msg updated', msg);
+        const senderSocket = Array.from(io.sockets.sockets.values()).find(s => s.user.username === msg.user);
+        if (senderSocket && senderSocket !== socket) senderSocket.emit('msg updated', msg);
+      }
+    } catch (err) {
+      socket.emit('error notice', 'Failed to update Yeah count.');
     }
   });
 

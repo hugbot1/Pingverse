@@ -316,6 +316,7 @@ function applyFilter() {
     const isOwn = m.user === myUsername;
     const isEdited = m.hasOwnProperty('edited') ? m.edited : false;
     const hasReply = m.hasOwnProperty('replyTo') ? m.replyTo : null;
+    const yeahList = m.hasOwnProperty('yeahs') ? m.yeahs : [];
 
     const canDelete = myRole === 'admin' || isOwn;
     const canEdit = isOwn;
@@ -389,11 +390,31 @@ function applyFilter() {
     contentSpan.textContent = m.msg;
     msgElement.appendChild(contentSpan);
 
+    const footerDiv = document.createElement('div');
+    footerDiv.style.display = 'flex';
+    footerDiv.style.justifyContent = 'space-between';
+    footerDiv.style.alignItems = 'center';
+    footerDiv.style.marginTop = '4px';
+
+    const yBtn = document.createElement('button');
+    yBtn.style.background = yeahList.includes(myUsername) ? 'var(--accent)' : 'none';
+    yBtn.style.border = '1px solid var(--accent)';
+    yBtn.style.color = yeahList.includes(myUsername) ? '#fff' : 'var(--accent)';
+    yBtn.style.cursor = 'pointer';
+    yBtn.style.fontSize = '0.65rem';
+    yBtn.style.padding = '2px 6px';
+    yBtn.style.borderRadius = '4px';
+    yBtn.textContent = `Yeah! (${yeahList.length})`;
+    yBtn.onclick = () => socket.emit('toggle yeah', m._id);
+    footerDiv.appendChild(yBtn);
+
     const timeDiv = document.createElement('div');
     timeDiv.className = 'msg-time';
+    timeDiv.style.margin = '0';
     timeDiv.textContent = new Date(m.ts).toLocaleString([], { month: 'numeric', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    msgElement.appendChild(timeDiv);
+    footerDiv.appendChild(timeDiv);
 
+    msgElement.appendChild(footerDiv);
     container.appendChild(msgElement);
   });
 }
