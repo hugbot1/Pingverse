@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pingverse</title>
   <link rel="stylesheet" href="./client/styles.css">
-<link rel="icon" type="image/x-icon" href="./assets/logos/favicon.ico">
+  <link rel="icon" type="image/x-icon" href="./assets/logos/favicon.ico">
 </head>
 
 <body>
@@ -19,14 +19,17 @@
       <div id="dynamic-settings-fields"></div>
 
       <button class="btn" onclick="saveSettings()">Update Account</button>
-      <button class="btn" style="background:var(--danger); margin-top:10px" onclick="deleteAccount()">Delete Account & Data</button>
-      <button class="btn" style="background:none; border:1px solid #444; margin-top:10px" onclick="closeSettings()">Cancel</button>
+      <button class="btn" style="background:var(--danger); margin-top:10px" onclick="deleteAccount()">Delete Account &
+        Data</button>
+      <button class="btn" style="background:none; border:1px solid #444; margin-top:10px"
+        onclick="closeSettings()">Cancel</button>
     </div>
   </div>
 
   <div id="auth-screen">
     <div class="card">
-      <div class="tabs"><button id="tab-login" class="tab active" onclick="switchTab('login')">LOGIN</button><button id="tab-register" class="tab" onclick="switchTab('register')">REGISTER</button></div>
+      <div class="tabs"><button id="tab-login" class="tab active" onclick="switchTab('login')">LOGIN</button><button
+          id="tab-register" class="tab" onclick="switchTab('register')">REGISTER</button></div>
       <div id="auth-alert" class="alert"></div>
       <input id="f-username" type="text" placeholder="Username">
       <input id="f-password" type="password" placeholder="Password">
@@ -40,15 +43,20 @@
 
   <div id="chat-screen">
     <div class="sidebar">
-      <div class="sidebar-header"><input id="user-search" placeholder="Search people..." oninput="filterUsers()"><span class="settings-trigger-label">Click on a user to dm</span></div>
+      <div class="sidebar-header"><input id="user-search" placeholder="Search people..." oninput="filterUsers()"><span
+          class="settings-trigger-label">Click on a user to dm</span></div>
       <div id="user-list" class="user-list"></div>
 
       <div id="admin-tools">
         <p style="font-size:0.65rem; color:var(--accent); margin-bottom:8px; font-weight:bold;">Tools</p>
         <input id="bc-input" placeholder="Top message..." style="font-size:0.75rem; padding:8px; margin-bottom:8px;">
-        <label class="admin-label" style="font-size:0.75rem;"><input type="checkbox" id="bc-check"> <span>Important</span></label>
-        <button class="btn" onclick="updateBroadcast()" style="padding:8px; font-size:0.75rem; margin-bottom:8px;">Set Message</button>
-        <button class="btn" id="admin-clear-btn" onclick="clearChat()" style="display: none; padding:8px; font-size:0.75rem; background-color: var(--danger);">Clear Global Chat</button>
+        <label class="admin-label" style="font-size:0.75rem;"><input type="checkbox" id="bc-check">
+          <span>Important</span></label>
+        <button class="btn" onclick="updateBroadcast()" style="padding:8px; font-size:0.75rem; margin-bottom:8px;">Set
+          Message</button>
+        <button class="btn" id="admin-clear-btn" onclick="clearChat()"
+          style="display: none; padding:8px; font-size:0.75rem; background-color: var(--danger);">Clear Global
+          Chat</button>
       </div>
 
       <div class="sidebar-footer">
@@ -60,7 +68,8 @@
           <span class="gear-icon">P</span>
         </div>
         <div class="logout-row">
-          <button onclick="doSignOut()" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size: 0.75rem; font-weight: 500; opacity: 0.8;">Logout</button>
+          <button onclick="doSignOut()"
+            style="background:none; border:none; color:var(--danger); cursor:pointer; font-size: 0.75rem; font-weight: 500; opacity: 0.8;">Logout</button>
         </div>
       </div>
     </div>
@@ -68,7 +77,9 @@
     <div class="main-chat">
       <div class="chat-header">
         <div style="display:flex; align-items:center; z-index: 2;">
-          <button style="display:none; background:none; border:1px solid var(--accent); color:var(--accent); padding:4px 8px; border-radius:4px; cursor:pointer" id="back-btn" onclick="exitPrivate()">Return</button>
+          <button
+            style="display:none; background:none; border:1px solid var(--accent); color:var(--accent); padding:4px 8px; border-radius:4px; cursor:pointer"
+            id="back-btn" onclick="exitPrivate()">Return</button>
           <span id="chat-title">Pingverse Chat</span>
         </div>
 
@@ -76,7 +87,8 @@
           <img src="./assets/logos/logo.png" alt="Logo" class="logo-img" id="header-logo">
         </div>
 
-        <button onclick="toggleSearch()" style="background:none; border:1px solid var(--accent); color:var(--accent); padding:4px 8px; border-radius:4px; cursor:pointer">Search</button>
+        <button onclick="toggleSearch()"
+          style="background:none; border:1px solid var(--accent); color:var(--accent); padding:4px 8px; border-radius:4px; cursor:pointer">Search</button>
       </div>
 
       <div id="broadcast-bar"><span id="bc-text"></span></div>
@@ -106,7 +118,9 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="./client/app.js"></script>
-  <button id="scroll-bottom-btn" onclick="scrollToBottomInstant()" style="display:none; position:fixed; bottom:85px; right:30px; background:var(--accent); color:white; border:none; padding:8px 14px; border-radius:20px; font-weight:bold; cursor:pointer; font-size:0.75rem; box-shadow:0 4px 12px rgba(0,0,0,0.3); z-index:99; transition:all 0.2s ease;">↓ New Messages</button>
+  <button id="scroll-bottom-btn" onclick="scrollToBottomInstant()"
+    style="display:none; position:fixed; bottom:85px; right:30px; background:var(--accent); color:white; border:none; padding:8px 14px; border-radius:20px; font-weight:bold; cursor:pointer; font-size:0.75rem; box-shadow:0 4px 12px rgba(0,0,0,0.3); z-index:99; transition:all 0.2s ease;">↓
+    New Messages</button>
 </body>
 
 </html>
