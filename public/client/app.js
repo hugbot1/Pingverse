@@ -183,8 +183,16 @@ function enterChat(token) {
       const leftSide = document.createElement('div');
       const nameSpan = document.createElement('span');
       nameSpan.style.fontWeight = '500';
-      nameSpan.textContent = u.name + (u.role === 'admin' ? ' (Owner)' : u.role === 'bot' ? ' (Bot)' : '');
+      nameSpan.textContent = u.name;
       leftSide.appendChild(nameSpan);
+
+      // Accent colorized tags inside the sidebar user list
+      if (u.role === 'admin' || u.role === 'bot') {
+        const tagSpan = document.createElement('span');
+        tagSpan.style.color = 'var(--accent)';
+        tagSpan.textContent = u.role === 'admin' ? ' (Owner)' : ' (Bot)';
+        leftSide.appendChild(tagSpan);
+      }
 
       if (u.isMuted) {
         const muteLabel = document.createElement('span');
@@ -321,15 +329,24 @@ function applyFilter() {
     metaSpan.className = 'msg-meta';
 
     const labelSpan = document.createElement('span');
-    labelSpan.textContent = m.user + (m.role === 'admin' ? ' (Owner)' : m.role === 'bot' ? ' (Bot)' : '');
+    labelSpan.textContent = m.user;
+    metaSpan.appendChild(labelSpan);
+
+    // Accent colorized tags inside messages list window
+    if (m.role === 'admin' || m.role === 'bot') {
+      const tagSpan = document.createElement('span');
+      tagSpan.style.color = 'var(--accent)';
+      tagSpan.textContent = m.role === 'admin' ? ' (Owner)' : ' (Bot)';
+      metaSpan.appendChild(tagSpan);
+    }
+
     if (isEdited) {
       const ed = document.createElement('small');
       ed.style.fontStyle = 'italic';
       ed.style.opacity = '0.6';
       ed.textContent = ' (edited)';
-      labelSpan.appendChild(ed);
+      metaSpan.appendChild(ed);
     }
-    metaSpan.appendChild(labelSpan);
 
     const actionDiv = document.createElement('div');
     actionDiv.style.display = 'inline-block';
