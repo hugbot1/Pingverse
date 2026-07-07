@@ -404,7 +404,24 @@ function applyFilter() {
     yBtn.style.fontSize = '0.65rem';
     yBtn.style.padding = '2px 6px';
     yBtn.style.borderRadius = '4px';
-    yBtn.textContent = `Yeah! (${yeahList.length})`;
+    yBtn.style.display = 'flex';
+    yBtn.style.alignItems = 'center';
+    yBtn.style.gap = '4px';
+
+    const img = document.createElement('img');
+    img.src = '../assets/ui/yeah.png';
+    img.style.width = '12px';
+    img.style.height = '12px';
+    img.style.objectFit = 'contain';
+    if (yeahList.includes(myUsername)) {
+      img.style.filter = 'brightness(0) invert(1)';
+    }
+    yBtn.appendChild(img);
+
+    const textSpan = document.createElement('span');
+    textSpan.textContent = `Yeah! (${yeahList.length})`;
+    yBtn.appendChild(textSpan);
+
     yBtn.onclick = () => socket.emit('toggle yeah', m._id);
     footerDiv.appendChild(yBtn);
 
