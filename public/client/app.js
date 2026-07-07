@@ -87,7 +87,7 @@ function enterChat(token) {
     const clearBtn = document.getElementById('admin-clear-btn');
     if (clearBtn) clearBtn.style.display = 'none';
 
-    document.getElementById('user-badge').innerText = username + (role === 'admin' ? ' (Owner)' : role === 'bot' ? ' (Bot)' : '');
+    document.getElementById('user-badge').innerText = username + (role === 'admin' ? ' (Owner)' : '');
 
     if (role === 'admin') {
       document.getElementById('admin-tools').style.display = 'block';
@@ -186,12 +186,12 @@ function enterChat(token) {
       nameSpan.textContent = u.name;
       leftSide.appendChild(nameSpan);
 
-      // Accent colorized tags inside the sidebar user list
-      if (u.role === 'admin' || u.role === 'bot') {
-        const tagSpan = document.createElement('span');
-        tagSpan.style.color = 'var(--accent)';
-        tagSpan.textContent = u.role === 'admin' ? ' (Owner)' : ' (Bot)';
-        leftSide.appendChild(tagSpan);
+      if (u.role === 'admin') {
+        const ownerLabel = document.createElement('small');
+        ownerLabel.style.color = 'var(--accent)';
+        ownerLabel.style.fontWeight = 'bold';
+        ownerLabel.textContent = ' (Owner)';
+        leftSide.appendChild(ownerLabel);
       }
 
       if (u.isMuted) {
@@ -329,24 +329,15 @@ function applyFilter() {
     metaSpan.className = 'msg-meta';
 
     const labelSpan = document.createElement('span');
-    labelSpan.textContent = m.user;
-    metaSpan.appendChild(labelSpan);
-
-    // Accent colorized tags inside messages list window
-    if (m.role === 'admin' || m.role === 'bot') {
-      const tagSpan = document.createElement('span');
-      tagSpan.style.color = 'var(--accent)';
-      tagSpan.textContent = m.role === 'admin' ? ' (Owner)' : ' (Bot)';
-      metaSpan.appendChild(tagSpan);
-    }
-
+    labelSpan.textContent = m.user + (m.role === 'admin' ? ' (Owner)' : '');
     if (isEdited) {
       const ed = document.createElement('small');
       ed.style.fontStyle = 'italic';
       ed.style.opacity = '0.6';
       ed.textContent = ' (edited)';
-      metaSpan.appendChild(ed);
+      labelSpan.appendChild(ed);
     }
+    metaSpan.appendChild(labelSpan);
 
     const actionDiv = document.createElement('div');
     actionDiv.style.display = 'inline-block';
