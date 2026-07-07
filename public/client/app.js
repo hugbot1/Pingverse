@@ -87,7 +87,7 @@ function enterChat(token) {
     const clearBtn = document.getElementById('admin-clear-btn');
     if (clearBtn) clearBtn.style.display = 'none';
 
-    document.getElementById('user-badge').innerText = username + (role === 'admin' ? ' (Owner)' : '');
+    document.getElementById('user-badge').innerText = username + (role === 'admin' ? ' (Owner)' : role === 'bot' ? ' (Bot)' : '');
 
     if (role === 'admin') {
       document.getElementById('admin-tools').style.display = 'block';
@@ -183,7 +183,7 @@ function enterChat(token) {
       const leftSide = document.createElement('div');
       const nameSpan = document.createElement('span');
       nameSpan.style.fontWeight = '500';
-      nameSpan.textContent = u.name;
+      nameSpan.textContent = u.name + (u.role === 'bot' ? ' (Bot)' : '');
       leftSide.appendChild(nameSpan);
 
       if (u.role === 'admin') {
@@ -329,7 +329,7 @@ function applyFilter() {
     metaSpan.className = 'msg-meta';
 
     const labelSpan = document.createElement('span');
-    labelSpan.textContent = m.user + (m.role === 'admin' ? ' (Owner)' : '');
+    labelSpan.textContent = m.user + (m.role === 'admin' ? ' (Owner)' : m.role === 'bot' ? ' (Bot)' : '');
     if (isEdited) {
       const ed = document.createElement('small');
       ed.style.fontStyle = 'italic';
