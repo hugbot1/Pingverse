@@ -183,16 +183,8 @@ function enterChat(token) {
       const leftSide = document.createElement('div');
       const nameSpan = document.createElement('span');
       nameSpan.style.fontWeight = '500';
-      nameSpan.textContent = u.name + (u.role === 'bot' ? ' (Bot)' : '');
+      nameSpan.textContent = u.name + (u.role === 'admin' ? ' (Owner)' : u.role === 'bot' ? ' (Bot)' : '');
       leftSide.appendChild(nameSpan);
-
-      if (u.role === 'admin') {
-        const ownerLabel = document.createElement('small');
-        ownerLabel.style.color = 'var(--accent)';
-        ownerLabel.style.fontWeight = 'bold';
-        ownerLabel.textContent = ' (Owner)';
-        leftSide.appendChild(ownerLabel);
-      }
 
       if (u.isMuted) {
         const muteLabel = document.createElement('span');
