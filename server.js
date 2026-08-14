@@ -134,13 +134,22 @@ io.on('connection', async (socket) => {
   socket.emit('welcome', { username: name, role: role, history: history.reverse() });
 
   socket.on('chat message', async (data) => {
+    if (role !== 'admin') {
+      return socket.emit('error notice', 'Chat is now locked. Please read the news announcement at the top.');
+    }
+
     const user = await User.findOne({ username: name });
+
     if (user.mutedUntil && user.mutedUntil > new Date()) {
-      return socket.emit('error notice', `You are muted until ${user.mutedUntil.toLocaleTimeString()}`);
+      return socket.emit(
+        'error notice',
+        `You are muted until ${user.mutedUntil.toLocaleTimeString()}`
+      );
     }
 
     const msgContent = typeof data === 'string' ? data : data.msg;
     const cleanMsg = msgContent.trim().substring(0, 500);
+
     if (!cleanMsg) return;
 
     const entry = await new Message({
@@ -158,11 +167,18 @@ io.on('connection', async (socket) => {
       io.emit('chat message', entry);
     } else {
       socket.emit('chat message', entry);
-      const targetSocket = Array.from(io.sockets.sockets.values()).find(s => s.user.username === entry.to);
+
+      const targetSocket = Array.from(
+        io.sockets.sockets.values()
+      ).find(
+        s => s.user.username === entry.to
+      );
+
       if (targetSocket) {
         targetSocket.emit('chat message', entry);
         targetSocket.emit('user list update');
       }
+
       socket.emit('user list update');
     }
   });
