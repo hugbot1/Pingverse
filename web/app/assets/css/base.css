@@ -1,0 +1,147 @@
+:root {
+  --bg: #302e2b;
+  --sidebar: #262522;
+  --surface: #302e2b;
+  --cards: #262522;
+  --text: #e9edef;
+  --text-muted: #8696a0;
+  --accent: #6fa74a;
+  --accent-hover: #588838;
+  --danger: #f15c5c;
+  --input-bg: #2a3338;
+  --border: #444;
+  --border-dark: #222;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  width: 100%;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Nuxt inserts this wrapper between body and each page. Make it occupy the
+   viewport and pass the old page-level flex layout through to its child. */
+#__nuxt {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.card {
+  background: var(--cards);
+  padding: 2rem;
+  border-radius: 12px;
+  width: 350px;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  color: white;
+  border-radius: 6px;
+  outline: none;
+  font: inherit;
+}
+
+.btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--accent);
+  border: none;
+  color: white;
+  font-weight: bold;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.btn:hover {
+  background: var(--accent-hover);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  background: var(--danger);
+  margin-top: 10px;
+}
+
+.btn-danger:hover {
+  background: #d94a4a;
+}
+
+.btn-outline {
+  background: none;
+  border: 1px solid var(--border);
+  margin-top: 10px;
+}
+
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-ghost-accent {
+  background: none;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: normal;
+  width: auto;
+}
+
+.btn-ghost-accent:hover {
+  background: var(--accent-hover);
+  color: white;
+}
+
+.btn-text {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  width: auto;
+  padding: 0;
+}
+
+.alert {
+  color: var(--danger);
+  font-size: 0.8rem;
+  margin-bottom: 1rem;
+  display: none;
+}
+
+.alert.visible {
+  display: block;
+}
+
+.logo-img {
+  max-height: 40px;
+  width: auto;
+  object-fit: contain;
+}

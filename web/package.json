@@ -1,0 +1,24 @@
+{
+  "name": "pingverse-web",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Pingverse frontend built with Vue and Nuxt, connected to the API over REST and Socket.IO.",
+  "type": "module",
+  "main": ".output/server/index.mjs",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "dev": "nuxt dev --host 0.0.0.0",
+    "start": "nuxt dev --host 0.0.0.0",
+    "build": "nuxt build",
+    "preview": "nuxt preview --host 0.0.0.0",
+    "serve": "node --import dotenv/config .output/server/index.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "nuxt": "^4.5.2",
+    "socket.io-client": "^4.8.4",
+    "vue": "^3.5.0"
+  }
+}

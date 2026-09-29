@@ -1,0 +1,210 @@
+/* The admin page scrolls normally (base.css locks the chat layout). */
+body.admin-page {
+  display: block;
+  height: auto;
+  min-height: 100vh;
+  overflow-y: auto;
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 24px;
+  background: var(--sidebar);
+  border-bottom: 1px solid var(--border-dark);
+}
+
+.admin-header-left,
+.admin-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-title {
+  font-size: 1.1rem;
+}
+
+.admin-name {
+  color: var(--accent);
+  font-weight: bold;
+  font-size: 0.85rem;
+}
+
+.admin-main {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.panel {
+  background: var(--cards);
+  border: 1px solid var(--border-dark);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.panel-title {
+  font-size: 1rem;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-note {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+.panel-note code {
+  background: var(--input-bg);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.panel-actions {
+  margin-bottom: 12px;
+}
+
+.count-badge {
+  background: var(--danger);
+  color: white;
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 0.7rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.admin-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-dark);
+  vertical-align: middle;
+}
+
+.admin-table td.wrap-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 420px;
+}
+
+.cell-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.empty-state {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  padding: 8px 0;
+}
+
+.tag {
+  font-size: 0.68rem;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--input-bg);
+  color: var(--text-muted);
+}
+
+.tag.admin {
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.tag.warn {
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.small-btn {
+  width: auto;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 5px;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.small-btn.primary {
+  background: var(--accent);
+}
+
+.small-btn.primary:hover {
+  background: var(--accent-hover);
+}
+
+.small-btn.neutral {
+  background: #4a4744;
+}
+
+.small-btn.neutral:hover {
+  background: #5a5754;
+}
+
+.small-btn.danger {
+  background: var(--danger);
+}
+
+.small-btn.danger:hover {
+  background: #d94a4a;
+}
+
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.inline-form input[type="text"],
+.inline-form input:not([type]) {
+  flex: 1;
+  min-width: 220px;
+  margin-bottom: 0;
+}
+
+.check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.check-label input {
+  width: auto;
+  margin: 0;
+}
