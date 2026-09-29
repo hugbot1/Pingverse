@@ -20,5 +20,5 @@ export const adminLimiter = rateLimit({
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many admin requests. Slow down.' },
+  message: { error: 'Too many requests. Slow down.' },
 });

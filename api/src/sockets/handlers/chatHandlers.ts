@@ -15,7 +15,6 @@ import {
   safeParse,
 } from '../../utils/validation.js';
 
-// Blunt flood protection: at most 8 chat messages per 10 seconds per user.
 const chatRateLimiter = createSocketRateLimiter({ windowMs: 10_000, max: 8 });
 
 function broadcastMessage(io: AppServer, socket: AppSocket, entry: Message) {
@@ -174,8 +173,6 @@ export function registerChatHandlers(io: AppServer, socket: AppSocket) {
       return;
     }
 
-    // Always re-check the account in the database: it may have been
-    // deleted or had its role changed since this socket connected.
     const user = UserModel.findByUsername(name);
     if (!user || user.status !== 'approved') {
       socket.emit('force logout');
@@ -334,8 +331,6 @@ export function registerChatHandlers(io: AppServer, socket: AppSocket) {
     if (updated) broadcastUpdate(io, socket, updated);
   });
 
-  // Users can only delete their own messages. Deleting other people's
-  // messages is an admin action and lives in the admin panel.
   socket.on('delete message', (id: unknown) => {
     const parsed = safeParse(idSchema, id);
     if (!parsed.ok) return;

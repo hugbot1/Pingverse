@@ -4,7 +4,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { env } from './config/env.js';
-import { closeDb } from './db/index.js'; // importing also initializes the local SQLite database + schema
+import { closeDb } from './db/index.js';
 import { helmetMiddleware, corsMiddleware } from './middleware/security.js';
 import { attachUser, requireAuth } from './middleware/auth.js';
 import { requireTrustedOrigin } from './middleware/security.js';
@@ -55,8 +55,7 @@ app.post('/media/upload', requireTrustedOrigin, requireAuth, express.raw({ type:
   const type = String(req.get('x-file-type') || '').split(';')[0].trim().toLowerCase();
   if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'The selected file is empty.' });
   if (req.body.length > 10 * 1024 * 1024) return res.status(413).json({ error: 'Files must be 10 MB or smaller.' });
-  // Only render recognized media inline when its bytes match the declared type.
-  // Every other file type is retained as a generic download.
+
   const safeInlineType = allowedMediaTypes.has(type) && matchesMediaType(req.body, type) ? type : 'application/octet-stream';
   const id = randomUUID();
   const name = mediaName(req.query.name);
@@ -66,7 +65,7 @@ app.post('/media/upload', requireTrustedOrigin, requireAuth, express.raw({ type:
     MessageModel.registerUploadedMedia({ id, owner: req.user!.username, name, type: safeInlineType, size: req.body.length });
     res.status(201).json({ attachment: { id, name, type: safeInlineType, size: req.body.length } });
   } catch (error) {
-    try { fs.unlinkSync(diskPath); } catch {}
+    try { fs.unlinkSync(diskPath); } catch { }
     console.error('[media] upload failed:', errorMessage(error));
     res.status(500).json({ error: 'The file could not be uploaded.' });
   }
@@ -94,7 +93,6 @@ app.use('/admin', createAdminRouter(io));
 
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
-// Centralized error handler - never leak stack traces to clients.
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const errorType = (err as { type?: string } | null)?.type;
   if (errorType === 'entity.parse.failed') {
@@ -116,7 +114,6 @@ function shutdown(signal: string) {
     closeDb();
     process.exit(0);
   });
-  // Force-exit if close hangs (e.g. open socket connections).
   setTimeout(() => process.exit(1), 5000).unref();
 }
 

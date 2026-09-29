@@ -32,15 +32,11 @@ export function createSocketServer(httpServer: http.Server): AppServer {
   }, 30_000);
   idleSweep.unref?.();
 
-  // Authenticate every connection using the same httpOnly session cookie
-  // the REST API uses - no tokens are ever exposed to client-side JS.
   io.use((socket, next) => {
     const token = readSessionToken(socket.handshake.headers.cookie);
     const username = verifySession(token);
     if (!username) return next(new Error('Unauthorized'));
 
-    // Make sure the account behind the cookie still exists (it may have
-    // been deleted or is still awaiting approval since the token was issued).
     const user = UserModel.findByUsername(username);
     if (!user || user.status !== 'approved') return next(new Error('Unauthorized'));
 

@@ -1,12 +1,3 @@
-// Usage (run from the api/ folder):
-//   npm run set-role -- <username> <admin|user>
-//
-// This is the ONLY way to make someone an admin/owner. It edits the local
-// database directly, so it requires access to the machine running the API -
-// there is no web endpoint that can grant or remove the admin role.
-//
-// Making someone an admin also marks the account approved, so you can
-// bootstrap the very first admin: register normally, then run this.
 import { env } from '../src/config/env.js';
 import { closeDb } from '../src/db/index.js';
 import { UserModel } from '../src/models/userModel.js';

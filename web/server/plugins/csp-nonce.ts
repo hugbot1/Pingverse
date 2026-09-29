@@ -13,8 +13,6 @@ export default defineNitroPlugin((nitroApp) => {
     const nonce = event.context.cspNonce;
     if (!nonce) return;
 
-    // Nuxt emits some inline bootstrap scripts from the renderer itself,
-    // outside of Unhead. Attach this request's nonce before sending HTML.
     for (const key of ['head', 'bodyPrepend', 'body', 'bodyAppend']) {
       const chunks = html[key];
       if (!chunks) continue;

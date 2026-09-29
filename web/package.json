@@ -2,7 +2,7 @@
   "name": "pingverse-web",
   "version": "3.0.0",
   "private": true,
-  "description": "Pingverse frontend built with Vue and Nuxt, connected to the API over REST and Socket.IO.",
+  "description": "Pingverse web client",
   "type": "module",
   "main": ".output/server/index.mjs",
   "engines": {

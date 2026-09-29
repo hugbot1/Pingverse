@@ -6,9 +6,7 @@ import { updateAccountSchema, safeParse } from '../../utils/validation.js';
 import type { AppServer, AppSocket } from '../types.js';
 
 const BCRYPT_COST = 12;
-
-// Self-service account changes only. Acting on *other* people's accounts
-// is an admin action and lives in the admin panel (routes/adminRoutes.ts).
+.
 export function registerAccountHandlers(io: AppServer, socket: AppSocket) {
   const { username: name, role } = socket.user;
 
@@ -36,10 +34,8 @@ export function registerAccountHandlers(io: AppServer, socket: AppSocket) {
   });
 
   socket.on('delete account', () => {
-    // Admin roles are managed manually in the database, so an admin
-    // account can't be removed from inside the app.
     if (role === 'admin') {
-      return socket.emit('settings error', 'Admin accounts cannot be deleted from the app.');
+      return socket.emit('settings error', 'Admin accounts are protected.');
     }
 
     MessageModel.deleteByUsername(name);

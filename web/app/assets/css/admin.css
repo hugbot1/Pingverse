@@ -1,4 +1,3 @@
-/* The admin page scrolls normally (base.css locks the chat layout). */
 body.admin-page {
   display: block;
   height: auto;

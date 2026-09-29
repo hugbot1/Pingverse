@@ -17,15 +17,6 @@ import {
   safeParse,
 } from '../utils/validation.js';
 
-/**
- * Every admin action lives here and nowhere else. All routes require a
- * valid session whose account is currently an approved admin (checked
- * against the database on each request), a strictly matching Origin on
- * every state-changing call, and are rate limited and audit-logged.
- *
- * Admin accounts themselves can never be modified from here - roles are
- * only ever changed by editing the database directly.
- */
 export function createAdminRouter(io: AppServer) {
   const router = Router();
 
@@ -37,7 +28,6 @@ export function createAdminRouter(io: AppServer) {
     AuditModel.log(req.user!.username, action, target, detail);
   }
 
-  /** Validates the body and loads a non-admin target account, or responds with an error. */
   function loadTarget<T extends { username: string }>(
     req: Request,
     res: Response,
@@ -54,7 +44,7 @@ export function createAdminRouter(io: AppServer) {
       return null;
     }
     if (user.role === 'admin') {
-      res.status(403).json({ error: 'Admin accounts cannot be modified from the panel' });
+      res.status(403).json({ error: 'Admin accounts are protected' });
       return null;
     }
     return { user, data: parsed.data };
@@ -63,8 +53,6 @@ export function createAdminRouter(io: AppServer) {
   function socketsOf(username: string) {
     return [...io.sockets.sockets.values()].filter((s) => s.user && s.user.username === username);
   }
-
-  // ---------- reads ----------
 
   router.get('/users', (_req, res) => {
     res.json(
@@ -86,8 +74,6 @@ export function createAdminRouter(io: AppServer) {
     res.json(AuditModel.recent(50));
   });
 
-  // ---------- account approval ----------
-
   router.post('/users/approve', (req, res) => {
     const found = loadTarget(req, res, adminUserSchema);
     if (!found) return;
@@ -100,7 +86,6 @@ export function createAdminRouter(io: AppServer) {
     res.json({ ok: true });
   });
 
-  // Rejecting removes the pending account entirely so the name is free again.
   router.post('/users/reject', (req, res) => {
     const found = loadTarget(req, res, adminUserSchema);
     if (!found) return;
@@ -111,8 +96,6 @@ export function createAdminRouter(io: AppServer) {
     audit(req, 'reject_user', found.user.username);
     res.json({ ok: true });
   });
-
-  // ---------- moderation of approved accounts ----------
 
   router.post('/users/timeout', (req, res) => {
     const found = loadTarget(req, res, adminTimeoutSchema);
@@ -155,8 +138,6 @@ export function createAdminRouter(io: AppServer) {
     res.json({ ok: true });
   });
 
-  // ---------- site-wide content ----------
-
   router.post('/announcement', (req, res) => {
     const parsed = safeParse(announcementSchema, req.body);
     if (!parsed.ok) return res.status(400).json({ error: parsed.error });
@@ -173,7 +154,6 @@ export function createAdminRouter(io: AppServer) {
     res.json({ ok: true });
   });
 
-  // Only public (global) messages can be moderated here; DMs stay private.
   router.post('/messages/delete', (req, res) => {
     const parsed = safeParse(adminMessageSchema, req.body);
     if (!parsed.ok) return res.status(400).json({ error: parsed.error });

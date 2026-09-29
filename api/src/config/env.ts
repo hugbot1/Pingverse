@@ -5,15 +5,11 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// The api root is the folder containing package.json. Walk up to find it so
-// this resolves the same whether running from src/ or the compiled dist/src/
-// (a fixed "../.." would point at dist/ after compilation and silently open a
-// second, empty database there).
 function findApiRoot(start: string): string {
   let dir = start;
   while (!fs.existsSync(path.join(dir, 'package.json'))) {
     const parent = path.dirname(dir);
-    if (parent === dir) throw new Error('Could not locate the api folder (no package.json found).');
+    if (parent === dir) throw new Error('Could not locate the api folder');
     dir = parent;
   }
   return dir;
@@ -23,7 +19,7 @@ const API_ROOT = findApiRoot(__dirname);
 function required(name: string): string {
   const value = process.env[name];
   if (!value || !value.trim()) {
-    throw new Error(`Missing required environment variable: ${name}. Copy .env.example to .env and fill it in.`);
+    throw new Error(`Missing required environment variable: ${name}`);
   }
   return value.trim();
 }
@@ -49,7 +45,7 @@ const cookieSameSite = cookieSameSiteValue as 'lax' | 'strict' | 'none';
 
 const cookieSecure = bool('COOKIE_SECURE', false);
 if (cookieSameSite === 'none' && !cookieSecure) {
-  throw new Error('COOKIE_SAMESITE=none requires COOKIE_SECURE=true (browsers reject SameSite=None cookies without Secure).');
+  throw new Error('COOKIE_SAMESITE=none requires COOKIE_SECURE=true');
 }
 
 const databasePath = process.env.DATABASE_PATH

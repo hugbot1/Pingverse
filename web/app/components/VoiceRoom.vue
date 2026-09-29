@@ -4,7 +4,7 @@
     <div class="voice-room-participants">
       <div v-if="activeConversation" class="voice-participant-card" :class="{ speaking: localSpeaking && !muted && !forcedMuted }">
         <span class="voice-participant-name">{{ username }} (you)</span><span class="voice-participant-activity">{{ forcedMuted ? 'Muted by admin' : muted ? 'Muted' : 'Microphone on' }}</span>
-        <div class="voice-participant-menu"><button type="button" @click="toggleMenu('local')">Settings</button><div v-if="openMenuId === 'local'" class="voice-participant-controls"><button class="btn-ghost-accent voice-local-mute" :disabled="!localStream || forcedMuted" @click="toggleSelfMute">{{ forcedMuted ? 'Muted by admin' : muted ? 'Unmute microphone' : 'Mute microphone' }}</button></div></div>
+        <div class="voice-participant-menu"><button type="button" @click="toggleMenu('local')">Controls</button><div v-if="openMenuId === 'local'" class="voice-participant-controls"><button class="btn-ghost-accent voice-local-mute" :disabled="!localStream || forcedMuted" @click="toggleSelfMute">{{ forcedMuted ? 'Muted by admin' : muted ? 'Unmute microphone' : 'Mute microphone' }}</button></div></div>
       </div>
       <div v-for="(info, id) in peerInfo" :key="id" class="voice-participant-card" :class="{ speaking: info.speaking && !info.adminMuted }">
         <div class="voice-participant-identity"><span class="voice-participant-name">{{ info.username }}</span><span class="voice-participant-activity">{{ info.adminMuted ? 'Muted by admin' : info.localMuted ? 'Muted for you' : 'Connected' }}</span></div>
@@ -129,7 +129,7 @@ async function toggleVoice() {
   if (!socket?.connected) { errorText.value = 'Chat server is disconnected. Reconnect before joining voice.'; return; }
   if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) { errorText.value = 'Voice rooms need a secure browser connection and WebRTC support.'; return; }
   joining.value = true; errorText.value = ''; statusText.value = 'Waiting for microphone permission…';
-  try { audioContext ||= new (window.AudioContext || window.webkitAudioContext)(); audioContext.resume().catch(() => {}); } catch { /* Voice can connect without speaking detection. */ }
+  try { audioContext ||= new (window.AudioContext || window.webkitAudioContext)(); audioContext.resume().catch(() => {}); } catch { /* can connect */ }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     if (!joining.value || room !== props.conversation || socket !== props.socket || !socket.connected) { stream.getTracks().forEach((track) => track.stop()); joining.value = false; return; }
@@ -166,7 +166,7 @@ function leaveVoice() { cleanup(true); statusText.value = ''; errorText.value = 
 function onPresence({ to, participants }) { if (typeof to === 'string' && Array.isArray(participants)) voicePresence.set(to, participants); }
 function onJoined({ id, username: name, adminMuted }) { if (activeConversation.value && id !== props.socket?.id) makeOffer(id, name, adminMuted); }
 function onModeration({ username: name, muted: isMuted }) { for (const [id, info] of peerInfo) if (info.username === name) { info.adminMuted = isMuted; applyAudioPolicy(info); peerInfo.set(id, info); } }
-function onForcedMute({ muted: isMuted }) { forcedMuted.value = isMuted; for (const track of localStream.value?.getAudioTracks() || []) track.enabled = !muted.value && !forcedMuted.value; statusText.value = isMuted ? 'An admin muted your microphone for everyone in this room.' : 'Your microphone can be heard again.'; }
+function onForcedMute({ muted: isMuted }) { forcedMuted.value = isMuted; for (const track of localStream.value?.getAudioTracks() || []) track.enabled = !muted.value && !forcedMuted.value; statusText.value = isMuted ? 'An admin muted your microphone.' : 'You have been unmuted.'; }
 function onLeft({ id }) { removePeer(id); }
 function onDisconnect() { cleanup(false); }
 function attachSocket(socket) {

@@ -2,7 +2,7 @@
   "name": "pingverse-api",
   "version": "3.2.0",
   "private": true,
-  "description": "Pingverse API server - auth, chat, and admin moderation over REST + Socket.IO, backed by a local SQLite database (Node's built-in node:sqlite - no native build step).",
+  "description": "Pingverse API server",
   "type": "module",
   "main": "dist/src/index.js",
   "engines": {

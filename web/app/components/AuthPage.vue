@@ -4,14 +4,19 @@
     <div class="card">
       <div class="tabs">
         <button class="tab" :class="{ active: mode === 'login' }" type="button" @click="setMode('login')">LOGIN</button>
-        <button class="tab" :class="{ active: mode === 'register' }" type="button" @click="setMode('register')">REGISTER</button>
+        <button class="tab" :class="{ active: mode === 'register' }" type="button"
+          @click="setMode('register')">REGISTER</button>
       </div>
-      <div class="alert" :class="{ visible: alert.message, success: alert.success }" role="alert">{{ alert.message }}</div>
+      <div class="alert" :class="{ visible: alert.message, success: alert.success }" role="alert">{{ alert.message }}
+      </div>
       <form novalidate @submit.prevent="submit">
         <input v-model="username" type="text" placeholder="Username" autocomplete="username" maxlength="20" required>
-        <input v-model="password" type="password" placeholder="Password" :autocomplete="mode === 'login' ? 'current-password' : 'new-password'" maxlength="128" required>
-        <p class="field-hint" :class="{ hidden: mode !== 'register' }">Username: 3-20 letters, numbers, _ or -. Password: at least 8 characters. New accounts must be approved by an administrator before you can sign in.</p>
-        <button class="btn" type="submit" :disabled="busy">{{ busy ? 'Please wait…' : mode === 'login' ? 'Sign In' : 'Request Account' }}</button>
+        <input v-model="password" type="password" placeholder="Password"
+          :autocomplete="mode === 'login' ? 'current-password' : 'new-password'" maxlength="128" required>
+        <p class="field-hint" :class="{ hidden: mode !== 'register' }">Username: 3-20 letters, numbers, _ or -.
+          Password: at least 8 characters. Accounts must be approved by an admin before you can sign in.</p>
+        <button class="btn" type="submit" :disabled="busy">{{ busy ? 'Please wait…' : mode === 'login' ? 'Sign In' :
+          'Request Account' }}</button>
       </form>
     </div>
   </div>
@@ -45,7 +50,7 @@ onMounted(async () => {
     const me = await get('/auth/me');
     if (me?.username) window.location.href = '/chat';
   } catch {
-    // Keep the sign-in form usable while the API is unavailable.
+    // keep usable
   }
 });
 
@@ -60,7 +65,7 @@ async function submit() {
       const result = await post('/auth/register', { username: name, password: password.value });
       setMode('login');
       password.value = '';
-      showAlert(result.message || 'Account created. Waiting for admin approval.', true);
+      showAlert(result.message || 'Account requested.', true);
     } else {
       await post('/auth/login', { username: name, password: password.value });
       window.location.href = '/chat';

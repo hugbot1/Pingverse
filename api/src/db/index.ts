@@ -5,12 +5,8 @@ import { env } from '../config/env.js';
 
 fs.mkdirSync(path.dirname(env.databasePath), { recursive: true });
 
-// Uses Node's built-in SQLite module - no native addon, no compiler, no
-// prebuilt-binary lottery across OS/arch/Node-version combinations.
-// Requires Node >= 22.5 (see api/package.json "engines").
 export const db = new DatabaseSync(env.databasePath);
 
-// Sane, safe-by-default pragmas for a small local single-file DB.
 db.exec('PRAGMA journal_mode = WAL');
 db.exec('PRAGMA foreign_keys = ON');
 db.exec('PRAGMA synchronous = NORMAL');
@@ -107,7 +103,7 @@ if (!messageColumns.some((column) => column.name === 'reactions')) {
       const users = JSON.parse(row.yeahs || '[]');
       if (Array.isArray(users) && users.length) saveReactions.run(JSON.stringify({ '👍': users }), row.id);
     } catch {
-      // Ignore malformed legacy reaction data; the new column remains empty.
+      // ignore
     }
   }
 }

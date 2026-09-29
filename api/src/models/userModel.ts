@@ -33,9 +33,6 @@ const updateCredentials = db.prepare(
 const deleteByUsername = db.prepare(`DELETE FROM users WHERE username = ?`);
 
 export const UserModel = {
-  // New accounts are always created "pending" with the "user" role.
-  // Roles are never assigned by the app - only by editing the database
-  // (see scripts/set-role.ts).
   createPending({ username, hash }: { username: string; hash: string }): void {
     const created_at = Date.now();
     insertUser.run({ username, hash, role: 'user', status: 'pending', created_at });

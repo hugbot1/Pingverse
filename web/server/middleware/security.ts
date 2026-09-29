@@ -2,8 +2,7 @@ export default defineEventHandler((event) => {
   const config = useRuntimeConfig(event);
   const apiUrl = String(config.public.apiUrl).replace(/\/+$/, '');
   const websocketUrl = apiUrl.replace(/^http/, 'ws');
-  // Nuxt's SSR bootstrap is inline. Give this response a one-time nonce so
-  // the browser can run that bootstrap without allowing arbitrary inline JS.
+
   const nonce = crypto.randomUUID();
   event.context.cspNonce = nonce;
   const directives = [

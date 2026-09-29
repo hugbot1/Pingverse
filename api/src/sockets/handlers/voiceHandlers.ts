@@ -6,7 +6,6 @@ const MAX_ROOM_SIZE = 8;
 const adminMutedUsers = new Map<string, Set<string>>();
 const roomDetails = new Map<string, { conversation: string; members: Set<string> }>();
 
-// Shape of a WebRTC signal relayed between peers (validated in 'voice signal').
 type VoiceSignal = { type?: string; sdp?: unknown; candidate?: { candidate?: unknown } };
 
 function mutedUsersFor(key: string) {
@@ -41,9 +40,6 @@ function broadcastVoicePresence(io: AppServer, key: string) {
   });
   for (const recipient of io.sockets.sockets.values()) {
     if (details.conversation === 'global' || details.members.has(recipient.user?.username)) {
-      // Private voice-room names are relative to the viewer's open DM. The
-      // initiating user's target is not necessarily the same name the other
-      // participant uses for that conversation.
       const to = details.conversation === 'global'
         ? 'global'
         : [...details.members].find((member) => member !== recipient.user?.username);
@@ -81,7 +77,7 @@ export function registerVoiceHandlers(io: AppServer, socket: AppSocket) {
     const key = roomKeyFor(socket.user.username, conversation);
     const participants = io.sockets.adapter.rooms.get(key);
     if (!socket.data.voiceRoom && (participants?.size ?? 0) >= MAX_ROOM_SIZE) {
-      return respond({ ok: false, error: 'This voice room is full (8 people maximum).' });
+      return respond({ ok: false, error: 'This voice room is full.' });
     }
     if (socket.data.voiceRoom?.key !== key) leaveVoiceRoom(io, socket);
     if (!roomDetails.has(key)) {

@@ -1,8 +1,5 @@
 import { z } from 'zod';
 
-// 3-20 chars, letters/numbers/underscore/hyphen only - keeps usernames
-// URL- and DOM-safe and rules out impersonation-style whitespace tricks.
-// "global" is reserved because it is the recipient name for public chat.
 const usernameSchema = z
   .string()
   .trim()
@@ -86,7 +83,6 @@ export const typingSchema = z.object({
 
 export const presenceStatusSchema = z.enum(['online', 'idle', 'dnd']);
 
-// ---- admin panel payloads ----
 export const adminUserSchema = z.object({ username: usernameSchema });
 
 export const adminTimeoutSchema = z.object({
@@ -101,11 +97,6 @@ export const announcementSchema = z.object({
   important: z.boolean().optional().default(false),
 });
 
-/**
- * Runs a zod schema and returns { ok:true, data } or { ok:false, error }.
- * Never throws - callers use the discriminated result instead of try/catch,
- * which keeps handlers from crashing on bad input.
- */
 export function safeParse<S extends z.ZodTypeAny>(
   schema: S,
   data: unknown

@@ -29,8 +29,6 @@ body {
   overflow: hidden;
 }
 
-/* Nuxt inserts this wrapper between body and each page. Make it occupy the
-   viewport and pass the old page-level flex layout through to its child. */
 #__nuxt {
   display: flex;
   flex: 1 1 auto;

@@ -84,7 +84,6 @@ const findAuthorizedMedia = db.prepare(`
   )
 `);
 
-// Global messages, plus any DM where the given user is sender or recipient.
 const findRelevantToUser = db.prepare(`
   SELECT m.*, p.pinned_by, p.pinned_at, s.message_id AS saved_message_id
   FROM messages m
@@ -125,8 +124,6 @@ const updateReactions = db.prepare(`UPDATE messages SET reactions = ? WHERE id =
 const updateEdited = db.prepare(`UPDATE messages SET msg = ?, edited = 1 WHERE id = ?`);
 const deleteGlobal = db.prepare(`DELETE FROM messages WHERE to_user = 'global'`);
 const deleteById = db.prepare(`DELETE FROM messages WHERE id = ?`);
-// Removes everything a user sent AND every DM addressed to them, so a
-// later account reusing the name can't inherit old private messages.
 const deleteByUsername = db.prepare(`DELETE FROM messages WHERE user = ? OR to_user = ?`);
 const deleteSavedByUsername = db.prepare(`DELETE FROM saved_messages WHERE username=?`);
 const renameSavedUsername = db.prepare(`UPDATE saved_messages SET username=? WHERE username=?`);

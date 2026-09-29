@@ -3,7 +3,7 @@ import { env } from '../config/env.js';
 
 export const SESSION_COOKIE = 'pingverse_session';
 
-const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // keep in sync with default JWT_EXPIRES_IN
+const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export function readSessionToken(cookieHeader: string | undefined): string | null {
   if (!cookieHeader) return null;

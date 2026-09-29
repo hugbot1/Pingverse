@@ -2,8 +2,6 @@ import { UserModel } from '../models/userModel.js';
 import { MessageModel } from '../models/messageModel.js';
 import { presence } from './presence.js';
 
-// Only approved accounts appear in the roster; pending sign-ups are
-// visible to admins in the admin panel only.
 export function buildUserList(forUsername: string) {
   const users = UserModel.listApproved();
   const unreadMap = MessageModel.unreadCountsFor(forUsername);

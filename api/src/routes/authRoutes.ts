@@ -11,12 +11,8 @@ import { errorMessage } from '../utils/errors.js';
 
 const BCRYPT_COST = 12;
 
-// Cap on accounts waiting for approval, so a bot can't bury the admin queue.
 const MAX_PENDING_ACCOUNTS = 100;
 
-// A real bcrypt hash (same cost as real ones) computed once at startup. Login
-// compares against it when the username doesn't exist, so response time
-// doesn't reveal whether an account exists.
 const DUMMY_HASH = bcrypt.hashSync('pingverse-dummy-password', BCRYPT_COST);
 
 export const authRouter = Router();
@@ -45,10 +41,9 @@ authRouter.post('/register', authLimiter, requireTrustedOrigin, async (req, res)
     return res.status(500).json({ error: 'Registration failed' });
   }
 
-  // No session is issued: the account cannot be used until an admin approves it.
   res.status(201).json({
     status: 'pending',
-    message: 'Account created. An administrator must approve it before you can sign in.',
+    message: 'Account created. An admin must approve it before you can sign in.',
   });
 });
 
@@ -64,7 +59,6 @@ authRouter.post('/login', authLimiter, requireTrustedOrigin, async (req, res) =>
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
-  // Only revealed after the password was correct.
   if (user.status !== 'approved') {
     return res.status(403).json({
       error: 'Your account is awaiting approval by an administrator.',
