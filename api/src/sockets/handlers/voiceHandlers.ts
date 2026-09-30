@@ -36,7 +36,7 @@ function broadcastVoicePresence(io: AppServer, key: string) {
   if (!details) return;
   const participants = [...(io.sockets.adapter.rooms.get(key) || [])].map((id) => {
     const username = io.sockets.sockets.get(id)?.user?.username || 'User';
-    return { username, adminMuted: adminMutedUsers.get(key)?.has(username) || false };
+    return { id, username, adminMuted: adminMutedUsers.get(key)?.has(username) || false };
   });
   for (const recipient of io.sockets.sockets.values()) {
     if (details.conversation === 'global' || details.members.has(recipient.user?.username)) {
@@ -63,7 +63,7 @@ function sendVoicePresence(io: AppServer, socket: AppSocket, conversation: strin
   const key = roomKeyFor(socket.user.username, conversation);
   const participants = [...(io.sockets.adapter.rooms.get(key) || [])].map((id) => {
     const username = io.sockets.sockets.get(id)?.user?.username || 'User';
-    return { username, adminMuted: adminMutedUsers.get(key)?.has(username) || false };
+    return { id, username, adminMuted: adminMutedUsers.get(key)?.has(username) || false };
   });
   socket.emit('voice presence', { to: conversation, participants });
 }

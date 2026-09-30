@@ -13,7 +13,7 @@
     </div>
   </section>
   <div class="voice-presence" :class="{ hidden: !visibleRooms.length }" aria-label="People currently in visible voice rooms"><div class="voice-presence-users">
-    <div v-for="room in visibleRooms" :key="room.to" class="voice-presence-group"><span class="voice-presence-label">{{ room.to === 'global' ? 'Global Voice' : `${room.to} Voice` }}</span><span v-for="person in room.participants" :key="person.username" class="voice-presence-user" :class="{ 'admin-muted': person.adminMuted }" :title="`${person.username}${person.adminMuted ? ' · Muted by admin' : ''}`"><span class="voice-presence-name">{{ person.username }}</span><span v-if="person.adminMuted" class="voice-presence-muted">Muted</span></span></div>
+    <div v-for="room in visibleRooms" :key="room.to" class="voice-presence-group"><span class="voice-presence-label">{{ room.to === 'global' ? 'Global Voice' : `${room.to} Voice` }}</span><span v-for="person in room.participants" :key="person.id || person.username" class="voice-presence-user" :class="{ 'admin-muted': person.adminMuted }" :title="`${person.username}${person.adminMuted ? ' · Muted by admin' : ''}`"><span class="voice-presence-name">{{ person.username }}</span><span v-if="person.adminMuted" class="voice-presence-muted">Muted</span></span></div>
   </div></div>
   <p v-if="errorText" class="voice-error" role="status">{{ errorText }}</p>
 </template>
@@ -72,7 +72,7 @@ function startMetering() {
   meterTimer = setInterval(() => {
     const measure = (analyser) => { analyser.getByteTimeDomainData(typingSamples); let energy = 0; for (const sample of typingSamples) energy += ((sample - 128) / 128) ** 2; return Math.sqrt(energy / typingSamples.length) > 0.035; };
     if (localAnalyser.value) localSpeaking.value = measure(localAnalyser.value);
-    for (const [id, info] of peerInfo) if (info.analyser) { const speaking = measure(info.analyser); if (speaking !== info.speaking) peerInfo.set(id, { ...info, speaking }); }
+    for (const info of peerInfo.values()) if (info.analyser) { const speaking = measure(info.analyser); if (speaking !== info.speaking) info.speaking = speaking; }
   }, 100);
 }
 
@@ -86,10 +86,24 @@ function applyAudioPolicy(info) {
   if (info.remoteTrack) info.remoteTrack.enabled = !info.adminMuted;
 }
 
-function createPeer(id, name = 'User', adminMuted = false) {
+function ensureInfo(id, name, adminMuted) {
+  if (!peerInfo.has(id)) {
+    peerInfo.set(id, { username: name || 'User', volumePercent: 100, localMuted: false, adminMuted: Boolean(adminMuted), speaking: false, analyser: null, gainNode: null, remoteTrack: null, source: null });
+  }
+  const info = peerInfo.get(id);
+  if (name) info.username = name;
+  if (typeof adminMuted === 'boolean') info.adminMuted = adminMuted;
+  return info;
+}
+
+function teardownAudio(info) {
+  try { info.source?.disconnect(); info.analyser?.disconnect(); info.gainNode?.disconnect(); } catch {}
+  info.source = null; info.analyser = null; info.gainNode = null; info.remoteTrack = null; info.speaking = false;
+}
+
+function createPeer(id, name, adminMuted) {
   if (peers.has(id)) return peers.get(id);
-  const info = reactive({ username: name, volumePercent: 100, localMuted: false, adminMuted, speaking: false, analyser: null, gainNode: null, remoteTrack: null, source: null });
-  peerInfo.set(id, info);
+  const info = ensureInfo(id, name, adminMuted);
   const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
   peers.set(id, peer);
   for (const track of localStream.value?.getAudioTracks() || []) peer.addTrack(track, localStream.value);
@@ -100,20 +114,36 @@ function createPeer(id, name = 'User', adminMuted = false) {
     try { const meter = soundMeter(event.streams[0] || new MediaStream([event.track]), 1); info.analyser = meter.analyser; info.source = meter.source; info.gainNode = meter.gainNode; applyAudioPolicy(info); startMetering(); }
     catch { errorText.value = 'Voice is connected, but audio playback is unavailable in this browser.'; }
   };
-  peer.onconnectionstatechange = () => { if (peer.connectionState === 'failed') removePeer(id); else updateStatus(); };
+  peer.onconnectionstatechange = () => { if (peers.get(id) === peer) updateStatus(); };
   return peer;
 }
 
-function removePeer(id) { peers.get(id)?.close(); peers.delete(id); peerInfo.delete(id); if (activeConversation.value) updateStatus(); }
+function closePeer(id) {
+  const peer = peers.get(id);
+  if (!peer) return;
+  peer.onconnectionstatechange = null;
+  peer.close();
+  peers.delete(id);
+}
+
+function removePeer(id) {
+  closePeer(id);
+  const info = peerInfo.get(id);
+  if (info) teardownAudio(info);
+  peerInfo.delete(id);
+  if (activeConversation.value) updateStatus();
+}
+
 async function makeOffer(id, name, adminMuted) {
   try { const peer = createPeer(id, name, adminMuted); const offer = await peer.createOffer(); await peer.setLocalDescription(offer); activeSocket.value?.emit('voice signal', { to: id, signal: peer.localDescription.toJSON() }); }
   catch { errorText.value = `Could not connect to ${name || 'a participant'}.`; }
 }
 async function handleSignal({ from, username: name, signal }) {
   if (!activeConversation.value || !from || !signal) return;
+  if (signal.description) signal = signal.description;
+  if (signal.type === 'offer' && peers.get(from)?.remoteDescription) { closePeer(from); const stale = peerInfo.get(from); if (stale) teardownAudio(stale); }
   const peer = createPeer(from, name);
   try {
-    if (signal.description) signal = signal.description;
     if (signal.candidate) { if (peer.remoteDescription) await peer.addIceCandidate(signal.candidate); else { peer.pendingCandidates ||= []; peer.pendingCandidates.push(signal.candidate); } return; }
     await peer.setRemoteDescription(signal);
     for (const candidate of peer.pendingCandidates || []) await peer.addIceCandidate(candidate);
@@ -163,7 +193,22 @@ function cleanup(notifyServer) {
 }
 function leaveVoice() { cleanup(true); statusText.value = ''; errorText.value = ''; }
 
-function onPresence({ to, participants }) { if (typeof to === 'string' && Array.isArray(participants)) voicePresence.set(to, participants); }
+function reconcileRoster(participants) {
+  if (!participants.every((person) => person?.id)) return;
+  const myId = activeSocket.value?.id;
+  const present = new Set();
+  for (const person of participants) {
+    if (person.id === myId) continue;
+    present.add(person.id);
+    ensureInfo(person.id, person.username, Boolean(person.adminMuted));
+  }
+  for (const id of [...peerInfo.keys()]) if (!present.has(id)) removePeer(id);
+}
+function onPresence({ to, participants }) {
+  if (typeof to !== 'string' || !Array.isArray(participants)) return;
+  voicePresence.set(to, participants);
+  if (activeConversation.value && to === activeConversation.value) reconcileRoster(participants);
+}
 function onJoined({ id, username: name, adminMuted }) { if (activeConversation.value && id !== props.socket?.id) makeOffer(id, name, adminMuted); }
 function onModeration({ username: name, muted: isMuted }) { for (const [id, info] of peerInfo) if (info.username === name) { info.adminMuted = isMuted; applyAudioPolicy(info); peerInfo.set(id, info); } }
 function onForcedMute({ muted: isMuted }) { forcedMuted.value = isMuted; for (const track of localStream.value?.getAudioTracks() || []) track.enabled = !muted.value && !forcedMuted.value; statusText.value = isMuted ? 'An admin muted your microphone.' : 'You have been unmuted.'; }
@@ -171,13 +216,13 @@ function onLeft({ id }) { removePeer(id); }
 function onDisconnect() { cleanup(false); }
 function attachSocket(socket) {
   if (!socket) return;
-  socket.on('voice presence', onPresence); socket.on('voice participant joined', onJoined); socket.on('voice participant left', onLeft);
+  socket.on('connect', refreshPresence); socket.on('voice presence', onPresence); socket.on('voice participant joined', onJoined); socket.on('voice participant left', onLeft);
   socket.on('voice signal', handleSignal); socket.on('voice moderation update', onModeration); socket.on('voice forced mute', onForcedMute); socket.on('disconnect', onDisconnect);
   refreshPresence();
 }
 function detachSocket(socket) {
   if (!socket) return;
-  socket.off('voice presence', onPresence); socket.off('voice participant joined', onJoined); socket.off('voice participant left', onLeft);
+  socket.off('connect', refreshPresence); socket.off('voice presence', onPresence); socket.off('voice participant joined', onJoined); socket.off('voice participant left', onLeft);
   socket.off('voice signal', handleSignal); socket.off('voice moderation update', onModeration); socket.off('voice forced mute', onForcedMute); socket.off('disconnect', onDisconnect);
 }
 watch(() => props.socket, (socket, previous) => { detachSocket(previous); attachSocket(socket); });
