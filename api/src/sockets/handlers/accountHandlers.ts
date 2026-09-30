@@ -6,7 +6,7 @@ import { updateAccountSchema, safeParse } from '../../utils/validation.js';
 import type { AppServer, AppSocket } from '../types.js';
 
 const BCRYPT_COST = 12;
-.
+
 export function registerAccountHandlers(io: AppServer, socket: AppSocket) {
   const { username: name, role } = socket.user;
 
