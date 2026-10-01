@@ -21,9 +21,13 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 
+const CHUNK_MS = 250;
+const MAX_PLAYBACK_LEAD_SECONDS = 1.5;
+const SPEAKING_RMS_THRESHOLD = 0.02;
+
 const props = defineProps({ socket: Object, conversation: { type: String, default: 'global' }, username: { type: String, default: '' }, role: { type: String, default: 'user' } });
-const peers = new Map();
 const peerInfo = reactive(new Map());
+const peerPlayback = new Map();
 const voicePresence = reactive(new Map());
 const activeConversation = ref(null);
 const activeSocket = ref(null);
@@ -38,6 +42,7 @@ const openMenuId = ref(null);
 let audioContext = null;
 let meterTimer = null;
 let typingSamples;
+let recordGeneration = 0;
 const panelVisible = computed(() => Boolean(activeConversation.value || joining.value || errorText.value));
 const panelTitle = computed(() => activeConversation.value === 'global' ? 'Global Chat voice' : activeConversation.value ? `${activeConversation.value} voice` : 'Voice room');
 const statusText = ref('');
@@ -53,73 +58,124 @@ function refreshPresence() {
   if (props.conversation !== 'global') props.socket?.emit('get voice participants', { to: props.conversation });
 }
 watch(() => props.conversation, refreshPresence);
+function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
-function soundMeter(stream, gain) {
+function soundMeter(stream) {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass) throw new Error('Audio level detection is unavailable.');
   audioContext ||= new AudioContextClass();
   if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
   const analyser = audioContext.createAnalyser();
   analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.55;
-  const source = audioContext.createMediaStreamSource(stream); source.connect(analyser);
-  const gainNode = audioContext.createGain(); gainNode.gain.value = gain; analyser.connect(gainNode); gainNode.connect(audioContext.destination);
-  return { analyser, source, gainNode };
+  audioContext.createMediaStreamSource(stream).connect(analyser);
+  return analyser;
 }
 
 function startMetering() {
   clearInterval(meterTimer);
   typingSamples = new Uint8Array(512);
   meterTimer = setInterval(() => {
-    const measure = (analyser) => { analyser.getByteTimeDomainData(typingSamples); let energy = 0; for (const sample of typingSamples) energy += ((sample - 128) / 128) ** 2; return Math.sqrt(energy / typingSamples.length) > 0.035; };
-    if (localAnalyser.value) localSpeaking.value = measure(localAnalyser.value);
-    for (const [id, info] of peerInfo) if (info.analyser) { const speaking = measure(info.analyser); if (speaking !== info.speaking) peerInfo.set(id, { ...info, speaking }); }
+    if (!localAnalyser.value) return;
+    localAnalyser.value.getByteTimeDomainData(typingSamples);
+    let energy = 0; for (const sample of typingSamples) energy += ((sample - 128) / 128) ** 2;
+    localSpeaking.value = Math.sqrt(energy / typingSamples.length) > 0.035;
   }, 100);
 }
 
 function updateStatus() {
-  const connected = [...peers.values()].filter((peer) => peer.connectionState === 'connected').length;
-  statusText.value = connected ? `Connected · ${connected + 1} participant${connected === 0 ? '' : 's'}` : 'Waiting for others to connect…';
+  const count = peerInfo.size;
+  statusText.value = count ? `Connected · ${count + 1} participant${count === 0 ? '' : 's'}` : 'Waiting for others to connect…';
 }
 
 function applyAudioPolicy(info) {
   if (info.gainNode) info.gainNode.gain.value = info.adminMuted || info.localMuted ? 0 : info.volumePercent / 100;
-  if (info.remoteTrack) info.remoteTrack.enabled = !info.adminMuted;
 }
 
-function createPeer(id, name = 'User', adminMuted = false) {
-  if (peers.has(id)) return peers.get(id);
-  const info = reactive({ username: name, volumePercent: 100, localMuted: false, adminMuted, speaking: false, analyser: null, gainNode: null, remoteTrack: null, source: null });
+function createPeerInfo(id, name = 'User', adminMuted = false) {
+  if (peerInfo.has(id)) return peerInfo.get(id);
+  const gainNode = audioContext.createGain();
+  gainNode.gain.value = adminMuted ? 0 : 1;
+  gainNode.connect(audioContext.destination);
+  const info = reactive({ username: name, volumePercent: 100, localMuted: false, adminMuted, speaking: false, gainNode });
   peerInfo.set(id, info);
-  const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-  peers.set(id, peer);
-  for (const track of localStream.value?.getAudioTracks() || []) peer.addTrack(track, localStream.value);
-  peer.onicecandidate = (event) => { if (event.candidate) activeSocket.value?.emit('voice signal', { to: id, signal: { candidate: event.candidate.toJSON() } }); };
-  peer.ontrack = (event) => {
-    if (event.track.kind !== 'audio') return;
-    info.remoteTrack = event.track;
-    try { const meter = soundMeter(event.streams[0] || new MediaStream([event.track]), 1); info.analyser = meter.analyser; info.source = meter.source; info.gainNode = meter.gainNode; applyAudioPolicy(info); startMetering(); }
-    catch { errorText.value = 'Voice is connected, but audio playback is unavailable in this browser.'; }
-  };
-  peer.onconnectionstatechange = () => { if (peer.connectionState === 'failed') removePeer(id); else updateStatus(); };
-  return peer;
+  peerPlayback.set(id, { nextStartTime: 0 });
+  return info;
 }
 
-function removePeer(id) { peers.get(id)?.close(); peers.delete(id); peerInfo.delete(id); if (activeConversation.value) updateStatus(); }
-async function makeOffer(id, name, adminMuted) {
-  try { const peer = createPeer(id, name, adminMuted); const offer = await peer.createOffer(); await peer.setLocalDescription(offer); activeSocket.value?.emit('voice signal', { to: id, signal: peer.localDescription.toJSON() }); }
-  catch { errorText.value = `Could not connect to ${name || 'a participant'}.`; }
+function removePeer(id) {
+  const info = peerInfo.get(id);
+  if (info) {
+    clearTimeout(info._speakingTimer);
+    try { info.gainNode?.disconnect(); } catch { /* disconnected */ }
+  }
+  peerInfo.delete(id);
+  peerPlayback.delete(id);
+  if (activeConversation.value) updateStatus();
 }
-async function handleSignal({ from, username: name, signal }) {
-  if (!activeConversation.value || !from || !signal) return;
-  const peer = createPeer(from, name);
-  try {
-    if (signal.description) signal = signal.description;
-    if (signal.candidate) { if (peer.remoteDescription) await peer.addIceCandidate(signal.candidate); else { peer.pendingCandidates ||= []; peer.pendingCandidates.push(signal.candidate); } return; }
-    await peer.setRemoteDescription(signal);
-    for (const candidate of peer.pendingCandidates || []) await peer.addIceCandidate(candidate);
-    peer.pendingCandidates = [];
-    if (signal.type === 'offer') { const answer = await peer.createAnswer(); await peer.setLocalDescription(answer); activeSocket.value?.emit('voice signal', { to: from, signal: peer.localDescription.toJSON() }); }
-  } catch { errorText.value = `Could not connect to ${name || 'a participant'}.`; }
+
+async function playIncomingChunk(id, info, arrayBuffer) {
+  if (!audioContext || !arrayBuffer) return;
+  if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+
+  let buffer;
+  try { buffer = await audioContext.decodeAudioData(arrayBuffer.slice(0)); }
+  catch { return; }
+
+  const data = buffer.getChannelData(0);
+  let sumSquares = 0;
+  for (let i = 0; i < data.length; i += 8) sumSquares += data[i] * data[i];
+  const rms = Math.sqrt(sumSquares / Math.ceil(data.length / 8));
+  info.speaking = rms > SPEAKING_RMS_THRESHOLD;
+  clearTimeout(info._speakingTimer);
+  info._speakingTimer = setTimeout(() => { info.speaking = false; }, buffer.duration * 1000 + 200);
+
+  const playback = peerPlayback.get(id);
+  if (!playback) return;
+
+  const source = audioContext.createBufferSource();
+  source.buffer = buffer;
+  source.connect(info.gainNode);
+  const startAt = Math.max(audioContext.currentTime + 0.05, playback.nextStartTime);
+  source.start(startAt);
+  playback.nextStartTime = startAt + buffer.duration;
+
+  if (playback.nextStartTime - audioContext.currentTime > MAX_PLAYBACK_LEAD_SECONDS) {
+    playback.nextStartTime = audioContext.currentTime + 0.1;
+  }
+}
+
+function pickRecorderMimeType() {
+  const candidates = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm'];
+  for (const type of candidates) if (window.MediaRecorder?.isTypeSupported?.(type)) return type;
+  return '';
+}
+
+function recordOneChunk(stream, mimeType) {
+  return new Promise((resolve) => {
+    let recorder;
+    try { recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream); }
+    catch { resolve(null); return; }
+    const parts = [];
+    recorder.ondataavailable = (event) => { if (event.data && event.data.size > 0) parts.push(event.data); };
+    recorder.onerror = () => resolve(null);
+    recorder.onstop = () => resolve(parts.length ? new Blob(parts, { type: recorder.mimeType || mimeType }) : null);
+    try { recorder.start(); } catch { resolve(null); return; }
+    setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, CHUNK_MS);
+  });
+}
+
+async function runRecordingLoop(generation, stream) {
+  const mimeType = pickRecorderMimeType();
+  while (recordGeneration === generation && activeConversation.value) {
+    if (muted.value || forcedMuted.value) { await sleep(CHUNK_MS); continue; }
+    const blob = await recordOneChunk(stream, mimeType);
+    if (recordGeneration !== generation || !activeConversation.value) break;
+    if (!blob || !blob.size) continue;
+    try {
+      const buffer = await blob.arrayBuffer();
+      if (recordGeneration === generation) activeSocket.value?.emit('voice audio', buffer);
+    } catch { /* skip */ }
+  }
 }
 
 async function toggleVoice() {
@@ -127,22 +183,26 @@ async function toggleVoice() {
   if (joining.value) return;
   const socket = props.socket; const room = props.conversation;
   if (!socket?.connected) { errorText.value = 'Chat server is disconnected. Reconnect before joining voice.'; return; }
-  if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) { errorText.value = 'Voice rooms need a secure browser connection and WebRTC support.'; return; }
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder || !(window.AudioContext || window.webkitAudioContext)) {
+    errorText.value = 'Voice rooms need microphone and audio recording support in this browser.';
+    return;
+  }
   joining.value = true; errorText.value = ''; statusText.value = 'Waiting for microphone permission…';
-  try { audioContext ||= new (window.AudioContext || window.webkitAudioContext)(); audioContext.resume().catch(() => {}); } catch { /* can connect */ }
+  try { audioContext ||= new (window.AudioContext || window.webkitAudioContext)(); audioContext.resume().catch(() => {}); } catch { /* try */ }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     if (!joining.value || room !== props.conversation || socket !== props.socket || !socket.connected) { stream.getTracks().forEach((track) => track.stop()); joining.value = false; return; }
     localStream.value = stream;
-    try { localAnalyser.value = soundMeter(stream, 0).analyser; } catch { localAnalyser.value = null; }
+    try { localAnalyser.value = soundMeter(stream); } catch { localAnalyser.value = null; }
     joining.value = false; activeConversation.value = room; activeSocket.value = socket; muted.value = false; forcedMuted.value = false;
     statusText.value = 'Joining voice room…'; startMetering();
     socket.timeout(6000).emit('voice join', { to: room }, (error, result) => {
       if (error || !result?.ok) { errorText.value = result?.error || 'Could not join this voice room.'; cleanup(true); return; }
       forcedMuted.value = Boolean(result.forcedMuted);
-      for (const person of result.participants || []) createPeer(person.id, person.username, person.adminMuted);
-      for (const track of localStream.value?.getAudioTracks() || []) track.enabled = !muted.value && !forcedMuted.value;
+      for (const person of result.participants || []) createPeerInfo(person.id, person.username, person.adminMuted);
       updateStatus();
+      recordGeneration += 1;
+      runRecordingLoop(recordGeneration, stream);
     });
   } catch (error) { joining.value = false; errorText.value = error?.name === 'NotAllowedError' ? 'Allow microphone access in your browser to join voice.' : 'Could not start your microphone. Check that it is connected and available.'; }
 }
@@ -154,9 +214,10 @@ function moderateMute(info) {
 }
 
 function cleanup(notifyServer) {
+  recordGeneration += 1;
   if (notifyServer && activeSocket.value?.connected) activeSocket.value.emit('voice leave');
-  for (const id of [...peers.keys()]) removePeer(id);
-  peerInfo.clear(); clearInterval(meterTimer); meterTimer = null; localAnalyser.value = null;
+  for (const id of [...peerInfo.keys()]) removePeer(id);
+  peerInfo.clear(); peerPlayback.clear(); clearInterval(meterTimer); meterTimer = null; localAnalyser.value = null;
   for (const track of localStream.value?.getTracks() || []) track.stop();
   localStream.value = null; audioContext?.close().catch(() => {}); audioContext = null;
   activeConversation.value = null; activeSocket.value = null; muted.value = false; forcedMuted.value = false; joining.value = false; openMenuId.value = null;
@@ -164,21 +225,31 @@ function cleanup(notifyServer) {
 function leaveVoice() { cleanup(true); statusText.value = ''; errorText.value = ''; }
 
 function onPresence({ to, participants }) { if (typeof to === 'string' && Array.isArray(participants)) voicePresence.set(to, participants); }
-function onJoined({ id, username: name, adminMuted }) { if (activeConversation.value && id !== props.socket?.id) makeOffer(id, name, adminMuted); }
-function onModeration({ username: name, muted: isMuted }) { for (const [id, info] of peerInfo) if (info.username === name) { info.adminMuted = isMuted; applyAudioPolicy(info); peerInfo.set(id, info); } }
-function onForcedMute({ muted: isMuted }) { forcedMuted.value = isMuted; for (const track of localStream.value?.getAudioTracks() || []) track.enabled = !muted.value && !forcedMuted.value; statusText.value = isMuted ? 'An admin muted your microphone.' : 'You have been unmuted.'; }
+function onJoined({ id, username: name, adminMuted }) { if (!activeConversation.value || id === props.socket?.id) return; createPeerInfo(id, name, adminMuted); updateStatus(); }
+function onAudio({ from, username: name, chunk }) {
+  if (!activeConversation.value || !from || from === props.socket?.id) return;
+  const info = peerInfo.get(from) || createPeerInfo(from, name);
+  const arrayBuffer = chunk instanceof ArrayBuffer ? chunk : chunk?.buffer instanceof ArrayBuffer ? chunk.buffer : null;
+  if (arrayBuffer) playIncomingChunk(from, info, arrayBuffer);
+}
+function onModeration({ username: name, muted: isMuted }) { for (const [, info] of peerInfo) if (info.username === name) { info.adminMuted = isMuted; applyAudioPolicy(info); } }
+function onForcedMute({ muted: isMuted }) {
+  forcedMuted.value = isMuted;
+  for (const track of localStream.value?.getAudioTracks() || []) track.enabled = !muted.value && !forcedMuted.value;
+  statusText.value = isMuted ? 'An admin muted your microphone.' : 'You have been unmuted.';
+}
 function onLeft({ id }) { removePeer(id); }
 function onDisconnect() { cleanup(false); }
 function attachSocket(socket) {
   if (!socket) return;
   socket.on('voice presence', onPresence); socket.on('voice participant joined', onJoined); socket.on('voice participant left', onLeft);
-  socket.on('voice signal', handleSignal); socket.on('voice moderation update', onModeration); socket.on('voice forced mute', onForcedMute); socket.on('disconnect', onDisconnect);
+  socket.on('voice audio', onAudio); socket.on('voice moderation update', onModeration); socket.on('voice forced mute', onForcedMute); socket.on('disconnect', onDisconnect);
   refreshPresence();
 }
 function detachSocket(socket) {
   if (!socket) return;
   socket.off('voice presence', onPresence); socket.off('voice participant joined', onJoined); socket.off('voice participant left', onLeft);
-  socket.off('voice signal', handleSignal); socket.off('voice moderation update', onModeration); socket.off('voice forced mute', onForcedMute); socket.off('disconnect', onDisconnect);
+  socket.off('voice audio', onAudio); socket.off('voice moderation update', onModeration); socket.off('voice forced mute', onForcedMute); socket.off('disconnect', onDisconnect);
 }
 watch(() => props.socket, (socket, previous) => { detachSocket(previous); attachSocket(socket); });
 onMounted(refreshPresence);

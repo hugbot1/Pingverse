@@ -1,12 +1,14 @@
 import { UserModel } from '../../models/userModel.js';
 import { usernameOnlySchema, safeParse } from '../../utils/validation.js';
+import { createSocketRateLimiter } from '../../utils/socketRateLimiter.js';
 import type { Ack, AppServer, AppSocket } from '../types.js';
 
 const MAX_ROOM_SIZE = 8;
+const MAX_AUDIO_CHUNK_BYTES = 32 * 1024;
 const adminMutedUsers = new Map<string, Set<string>>();
 const roomDetails = new Map<string, { conversation: string; members: Set<string> }>();
 
-type VoiceSignal = { type?: string; sdp?: unknown; candidate?: { candidate?: unknown } };
+const audioRateLimiter = createSocketRateLimiter({ windowMs: 2000, max: 16 });
 
 function mutedUsersFor(key: string) {
   let users = adminMutedUsers.get(key);
@@ -126,18 +128,14 @@ export function registerVoiceHandlers(io: AppServer, socket: AppSocket) {
     respond({ ok: true, muted });
   });
 
-  socket.on('voice signal', (data: { to?: unknown; signal?: unknown } | null = {}) => {
+  socket.on('voice audio', (chunk: unknown) => {
     const room = socket.data.voiceRoom;
-    if (!room || !data || typeof data.to !== 'string' || !data.signal || typeof data.signal !== 'object') return;
-    const target = io.sockets.sockets.get(data.to);
-    if (!target || target.data.voiceRoom?.key !== room.key) return;
-    const signal = data.signal as VoiceSignal;
-    if (signal.type === 'offer' || signal.type === 'answer') {
-      if (typeof signal.sdp !== 'string' || signal.sdp.length > 50_000) return;
-    } else if (signal.candidate) {
-      if (typeof signal.candidate.candidate !== 'string' || signal.candidate.candidate.length > 4096) return;
-    } else return;
-    target.emit('voice signal', { from: socket.id, username: socket.user.username, signal });
+    if (!room) return;
+    if (!Buffer.isBuffer(chunk) || chunk.length === 0 || chunk.length > MAX_AUDIO_CHUNK_BYTES) return;
+    if (!audioRateLimiter(socket.user.username)) return;
+    if (mutedUsersFor(room.key).has(socket.user.username)) return;
+
+    socket.to(room.key).emit('voice audio', { from: socket.id, username: socket.user.username, chunk });
   });
 
   socket.on('disconnect', () => leaveVoiceRoom(io, socket));
