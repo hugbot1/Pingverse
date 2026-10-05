@@ -1,15 +1,20 @@
 <template>
   <div id="settings-modal" :class="{ visible: settingsOpen }" @click.self="closeSettings">
     <div class="modal-content"><h3 class="settings-title">Account Settings</h3><div class="alert" :class="{ visible: settingsError }" role="alert">{{ settingsError }}</div>
-      <form @submit.prevent="saveSettings"><input v-model="newUsername" type="text" placeholder="New Username (Optional)" autocomplete="off"><input v-model="newPassword" type="password" placeholder="New Password (Optional, min 8 chars)" autocomplete="new-password"><button class="btn" type="submit">Update Account</button></form>
+      <form @submit.prevent="saveSettings"><input v-model="newUsername" type="text" placeholder="New Username" autocomplete="off"><input v-model="newPassword" type="password" placeholder="New Password" autocomplete="new-password"><button class="btn" type="submit">Update Account</button></form>
+      <div class="settings-profile-section"><div class="settings-avatar-row"><img v-if="myHasAvatar" class="user-avatar settings-avatar" crossorigin="use-credentials" :src="`${api.apiUrl}/profile/avatar/${myUsername}?v=${myAvatarVersion}`" alt="Your avatar"><span v-else class="user-avatar settings-avatar user-avatar-fallback">{{ myUsername.charAt(0).toUpperCase() }}</span><input ref="avatarInput" class="attachment-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp" @change="selectAvatar"><button class="btn-ghost-accent" type="button" :disabled="avatarUploading" @click="avatarInput?.click()">{{ avatarUploading ? 'Uploading…' : 'Change Avatar' }}</button></div>
+        <form @submit.prevent="saveProfile"><textarea v-model="bioDraft" class="bio-textarea" placeholder="Bio" maxlength="200"></textarea><button class="btn" type="submit">Save Bio</button></form>
+      </div>
       <button class="btn btn-danger" type="button" @click="deleteOwnAccount">Delete Account &amp; Data</button><button class="btn btn-outline" type="button" @click="closeSettings">Cancel</button>
     </div>
   </div>
 
+  <dialog ref="profileDialog" class="forward-dialog profile-dialog"><div class="collection-content"><div v-if="profileUser" class="profile-card"><div class="profile-card-header"><img v-if="profileUser.hasAvatar" class="user-avatar profile-avatar" crossorigin="use-credentials" :src="`${api.apiUrl}/profile/avatar/${profileUser.username}?v=${profileUser.avatarVersion}`" :alt="`${profileUser.username}'s avatar`"><span v-else class="user-avatar profile-avatar user-avatar-fallback">{{ profileUser.username.charAt(0).toUpperCase() }}</span><div><strong>{{ profileUser.username }}</strong><span v-if="profileUser.role === 'admin'" class="user-owner-label">(Owner)</span><div class="user-presence-label">{{ profileStatusLabel }}</div></div></div><p class="profile-bio">{{ profileUser.bio || 'No bio set.' }}</p><p class="profile-meta">Member since {{ new Date(profileUser.createdAt).toLocaleDateString() }}</p></div><p v-else class="empty-state">{{ profileError || 'Loading…' }}</p><div class="forward-dialog-actions"><button class="btn btn-outline" type="button" @click="closeProfile">Close</button></div></div></dialog>
+
   <div id="chat-screen">
     <div class="sidebar">
-      <div class="sidebar-header"><input v-model="userSearch" placeholder="Search people..."><span class="info-label">Click a user to dm</span></div>
-      <ChatUserList :users="approvedUsers" :search="userSearch" :active-user="activePrivateUser" @open="startPrivate" />
+      <div class="sidebar-header"><input v-model="userSearch" placeholder="Search people..."></div>
+      <ChatUserList :users="approvedUsers" :search="userSearch" :active-user="activePrivateUser" :api-url="api.apiUrl" @open="startPrivate" @profile="openProfile" />
       <div class="sidebar-footer">
         <button v-if="myRole === 'admin'" class="btn-ghost-accent" type="button" @click="go('/admin')">Admin</button>
         <label class="presence-control"><span>Status</span><select v-model="presenceStatus" aria-label="Your presence status" @change="socket?.emit('set presence', presenceStatus)"><option value="online">Online</option><option value="idle">Idle</option><option value="dnd">Do Not Disturb</option></select></label>
@@ -28,7 +33,7 @@
       <div class="search-panel" :class="{ hidden: !searchActive }"><input ref="searchInput" v-model="searchQuery" type="search" placeholder="Search message text..." aria-label="Search message text" @input="requestSearch"><input v-model="searchAuthor" type="search" placeholder="From user..." aria-label="Filter by sender" @input="requestSearch"><select v-model="searchSort" aria-label="Search result order" @change="requestSearch"><option value="new">Newest First</option><option value="old">Oldest First</option></select><span class="search-result-count" aria-live="polite">{{ searchCount }}</span></div>
 
       <div id="messages" ref="messageScroller" @scroll="onMessageScroll">
-        <MessageItem v-for="message in visibleMessages" :key="message.id" :message="message" :my-username="myUsername" :my-role="myRole" :known-users="approvedUsers" :api-url="api.apiUrl" :picker-open="activeEmojiId === message.id" :picker-anchor="activeEmojiAnchor" @edit="editMessage" @delete="deleteMessage" @reply="setReply" @forward="openForward" @pin="togglePin" @save="toggleSaved" @react="toggleReaction" @jump="scrollToMessage" @toggle-picker="toggleEmojiPicker" />
+        <MessageItem v-for="message in visibleMessages" :key="message.id" :message="message" :my-username="myUsername" :my-role="myRole" :known-users="approvedUsers" :api-url="api.apiUrl" :picker-open="activeEmojiId === message.id" :picker-anchor="activeEmojiAnchor" @edit="editMessage" @delete="deleteMessage" @reply="setReply" @forward="openForward" @pin="togglePin" @save="toggleSaved" @react="toggleReaction" @jump="scrollToMessage" @toggle-picker="toggleEmojiPicker" @profile="openProfile" />
       </div>
       <div class="typing-indicator" aria-live="polite">{{ typingText }}</div>
       <div class="reply-preview-area" :class="{ visible: replyContext }"><span class="reply-preview-text">{{ replyContext ? `Replying to @${replyContext.user}: "${replyContext.text}..."` : '' }}</span><button class="reply-preview-cancel" type="button" @click="replyContext = null">&#10005;</button></div>
@@ -56,6 +61,8 @@ const voiceRef = ref(null);
 const myUsername = ref(''); const myRole = ref('user'); const fullHistory = ref([]); const approvedUsers = ref([]); const activePrivateUser = ref(null); const presenceStatus = ref('online');
 const userSearch = ref(''); const draft = ref(''); const attachments = ref([]); const sending = ref(false); const chatError = ref(''); const replyContext = ref(null);
 const settingsOpen = ref(false); const settingsError = ref(''); const newUsername = ref(''); const newPassword = ref('');
+const myHasAvatar = ref(false); const myAvatarVersion = ref(0); const bioDraft = ref(''); const avatarInput = ref(null); const avatarUploading = ref(false);
+const profileDialog = ref(null); const profileUser = ref(null); const profileError = ref('');
 const searchActive = ref(false); const searchQuery = ref(''); const searchAuthor = ref(''); const searchSort = ref('new'); const searchResults = ref([]); const searchCount = ref(''); const searchInput = ref(null);
 const messageScroller = ref(null); const messageInput = ref(null); const attachmentInput = ref(null); const typingMap = ref(new Map()); const mentionMatches = ref([]); const mentionIndex = ref(0); const unreadCount = ref(0); const showScrollButton = ref(false);
 const announcement = ref({ msg: '', important: false }); const alertsEnabled = ref(false); const alertsUnavailable = ref(false); const alertsTitle = ref('Enable browser notifications for direct messages and mentions'); const alertsLabel = ref('Alerts Off');
@@ -75,6 +82,13 @@ const mentionRange = computed(() => {
   const input = messageInput.value; if (!input) return null;
   const caret = input.selectionStart ?? draft.value.length; const before = draft.value.slice(0, caret); const match = /(^|[\s([{])@([A-Za-z0-9_-]{0,20})$/.exec(before);
   return match ? { query: match[2].toLowerCase(), start: caret - match[0].length + match[1].length, end: caret } : null;
+});
+
+const profileStatusLabel = computed(() => {
+  if (!profileUser.value) return '';
+  const labels = { online: 'Online', idle: 'Idle', dnd: 'Do Not Disturb', offline: 'Offline' };
+  const found = approvedUsers.value.find((user) => user.name === profileUser.value.username);
+  return labels[found?.presenceStatus] || labels.offline;
 });
 
 useHead({ title: 'Pingverse' });
@@ -128,6 +142,26 @@ function openSettings() { settingsError.value = ''; newUsername.value = ''; newP
 function closeSettings() { settingsOpen.value = false; }
 function saveSettings() { const username = newUsername.value.trim(); const password = newPassword.value.trim(); if (!username && !password) return; if (password && password.length < 8) { settingsError.value = 'New password must be at least 8 characters.'; return; } socket.value?.emit('update account', { username: username || null, password: password || null }); }
 function deleteOwnAccount() { if (confirm('Are you absolutely sure you want to completely erase your account and all your data? This action is fatal.')) socket.value?.emit('delete account', null); }
+function saveProfile() { socket.value?.emit('update profile', { bio: bioDraft.value.trim() }); }
+async function selectAvatar(event) {
+  const file = event.target.files?.[0]; event.target.value = '';
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { settingsError.value = 'Avatars must be 2 MB or smaller.'; return; }
+  avatarUploading.value = true; settingsError.value = '';
+  try {
+    const response = await fetch(`${api.apiUrl}/profile/avatar`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/octet-stream', 'X-File-Type': file.type }, body: file });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'The avatar could not be uploaded.');
+    myHasAvatar.value = true; myAvatarVersion.value = result.avatarVersion;
+  } catch (error) { settingsError.value = error.message; }
+  finally { avatarUploading.value = false; }
+}
+async function openProfile(username) {
+  profileUser.value = null; profileError.value = ''; profileDialog.value?.showModal();
+  try { profileUser.value = await api.get(`/profile/${encodeURIComponent(username)}`); }
+  catch (error) { profileError.value = error.message; }
+}
+function closeProfile() { profileDialog.value?.close(); profileUser.value = null; }
 async function signOut() { try { await api.post('/auth/logout', {}); } catch { /* if api cant be reached */ } go('/'); }
 function messageMentionsUser(message, username) { const escaped = username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); return new RegExp(`(^|[^A-Za-z0-9_-])@${escaped}(?![A-Za-z0-9_-])`, 'i').test(message || ''); }
 function setAlertsState() { const supported = 'Notification' in window; alertsUnavailable.value = !supported || Notification.permission === 'denied'; alertsEnabled.value = supported && Notification.permission === 'granted' && localStorage.getItem('pingverse.browser-alerts') === 'on'; alertsLabel.value = !supported ? 'Alerts Unavailable' : Notification.permission === 'denied' ? 'Alerts Blocked' : alertsEnabled.value ? 'Alerts On' : 'Alerts Off'; alertsTitle.value = alertsEnabled.value ? 'Turn browser notifications off' : 'Enable browser notifications for direct messages and mentions'; }
@@ -140,7 +174,8 @@ function onActivity() { const now = Date.now(); if (now - activityTimer > 30000)
 function connect() {
   const client = io(api.apiUrl, { withCredentials: true }); socket.value = client;
   client.on('connect_error', (error) => { console.error('Could not connect to the chat server:', error?.message || error); if (error?.message === 'Unauthorized') go('/'); });
-  client.on('welcome', (data) => { myUsername.value = data.username; myRole.value = data.role; fullHistory.value = data.history || []; client.emit('get users'); nextTick(scrollToBottom); });
+  client.on('welcome', (data) => { myUsername.value = data.username; myRole.value = data.role; fullHistory.value = data.history || []; bioDraft.value = data.bio || ''; myHasAvatar.value = Boolean(data.hasAvatar); myAvatarVersion.value = data.avatarVersion || 0; client.emit('get users'); nextTick(scrollToBottom); });
+  client.on('profile saved', ({ bio }) => { bioDraft.value = bio; settingsError.value = ''; });
   client.on('presence status', (value) => { if (['online', 'idle', 'dnd'].includes(value)) presenceStatus.value = value; });
   client.on('user list', (list) => { approvedUsers.value = list; }); client.on('user list update', () => client.emit('get users')); client.on('status change', () => client.emit('get users'));
   client.on('chat message', (message) => {

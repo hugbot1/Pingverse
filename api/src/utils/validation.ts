@@ -69,6 +69,12 @@ export const forwardMessageSchema = z.object({
   to: z.union([z.literal('global'), usernameSchema]),
 });
 
+export const bioSchema = z.string().trim().max(200);
+
+export const updateProfileSchema = z.object({
+  bio: bioSchema,
+});
+
 export const updateAccountSchema = z.object({
   username: usernameSchema.nullable().optional(),
   password: passwordSchema.nullable().optional(),

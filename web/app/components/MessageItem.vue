@@ -1,7 +1,8 @@
 <template>
   <article :id="`msg-${message.id}`" class="msg" :class="{ own: message.user === myUsername }">
     <div class="msg-meta">
-      <span>{{ message.user }}{{ message.role === 'admin' ? ' (Owner)' : '' }}<small v-if="message.edited"
+      <span><button class="msg-author" type="button" @click="$emit('profile', message.user)">{{ message.user
+          }}</button>{{ message.role === 'admin' ? ' (Owner)' : '' }}<small v-if="message.edited"
           class="msg-edited-label">(edited)</small></span>
       <div class="msg-actions">
         <button v-if="message.user === myUsername" class="msg-action-btn edit" type="button"
@@ -60,7 +61,7 @@
 import { computed, ref } from 'vue';
 
 const props = defineProps({ message: { type: Object, required: true }, myUsername: { type: String, default: '' }, myRole: { type: String, default: 'user' }, knownUsers: { type: Array, default: () => [] }, apiUrl: { type: String, required: true }, pickerOpen: Boolean, pickerAnchor: Object });
-defineEmits(['edit', 'delete', 'reply', 'forward', 'pin', 'save', 'react', 'jump', 'toggle-picker']);
+defineEmits(['edit', 'delete', 'reply', 'forward', 'pin', 'save', 'react', 'jump', 'toggle-picker', 'profile']);
 const pickerButton = ref(null);
 const known = computed(() => new Set([...props.knownUsers.map((user) => user.name.toLowerCase()), props.myUsername.toLowerCase()]));
 const visibleReactions = computed(() => Object.fromEntries(Object.entries(props.message.reactions || {}).filter(([, users]) => Array.isArray(users) && users.length)));

@@ -72,8 +72,33 @@
 
 .user-left {
   display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-text {
+  display: flex;
   flex-direction: column;
   align-items: flex-start;
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.user-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--input-bg);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: bold;
 }
 
 .user-right {
@@ -1260,4 +1285,81 @@
 
 #scroll-bottom-btn.visible {
   display: block;
+}
+
+.msg-author {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
+.msg-author:hover {
+  text-decoration: underline;
+}
+
+.settings-profile-section {
+  margin: 15px 0;
+  padding: 15px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.settings-avatar {
+  width: 48px;
+  height: 48px;
+  font-size: 1.2rem;
+  cursor: default;
+}
+
+.bio-textarea {
+  width: 100%;
+  min-height: 60px;
+  resize: vertical;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 10px;
+  font: inherit;
+  margin-bottom: 10px;
+}
+
+.profile-dialog .profile-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-avatar {
+  width: 56px;
+  height: 56px;
+  font-size: 1.4rem;
+  cursor: default;
+}
+
+.profile-bio {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.profile-meta {
+  color: var(--text-muted);
+  font-size: 0.78rem;
 }

@@ -13,5 +13,7 @@ export function buildUserList(forUsername: string) {
     presenceStatus: presence.statusOf(u.username),
     isMuted: Boolean(u.muted_until && u.muted_until > now),
     unreadCount: unreadMap[u.username] || 0,
+    hasAvatar: Boolean(u.avatar_type),
+    avatarVersion: u.avatar_version,
   }));
 }

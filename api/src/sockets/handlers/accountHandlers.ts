@@ -2,13 +2,20 @@ import bcrypt from 'bcryptjs';
 import { UserModel } from '../../models/userModel.js';
 import { MessageModel } from '../../models/messageModel.js';
 import { presence } from '../presence.js';
-import { updateAccountSchema, safeParse } from '../../utils/validation.js';
+import { updateAccountSchema, updateProfileSchema, safeParse } from '../../utils/validation.js';
 import type { AppServer, AppSocket } from '../types.js';
 
 const BCRYPT_COST = 12;
 
 export function registerAccountHandlers(io: AppServer, socket: AppSocket) {
   const { username: name, role } = socket.user;
+
+  socket.on('update profile', (data: unknown) => {
+    const parsed = safeParse(updateProfileSchema, data || {});
+    if (!parsed.ok) return socket.emit('settings error', parsed.error);
+    UserModel.setBio(name, parsed.data.bio);
+    socket.emit('profile saved', { bio: parsed.data.bio });
+  });
 
   socket.on('update account', async (data: unknown) => {
     const parsed = safeParse(updateAccountSchema, data || {});

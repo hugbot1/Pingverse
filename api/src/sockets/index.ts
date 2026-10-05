@@ -55,7 +55,15 @@ export function createSocketServer(httpServer: http.Server): AppServer {
     socket.emit('presence status', presence.statusOf(name));
 
     const history = MessageModel.historyForUser(name, 150);
-    socket.emit('welcome', { username: name, role, history });
+    const self = UserModel.findByUsername(name);
+    socket.emit('welcome', {
+      username: name,
+      role,
+      history,
+      bio: self?.bio || '',
+      hasAvatar: Boolean(self?.avatar_type),
+      avatarVersion: self?.avatar_version || 0,
+    });
     socket.emit('user list', buildUserList(name));
 
     registerChatHandlers(io, socket);

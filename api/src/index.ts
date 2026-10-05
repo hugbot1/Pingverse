@@ -12,6 +12,9 @@ import { authRouter } from './routes/authRoutes.js';
 import { createAdminRouter } from './routes/adminRoutes.js';
 import { createSocketServer } from './sockets/index.js';
 import { MessageModel } from './models/messageModel.js';
+import { UserModel } from './models/userModel.js';
+import { avatarPath, avatarExtensions, deleteAvatarFile, matchesAvatarType } from './utils/avatarStore.js';
+import { usernameOnlySchema, safeParse } from './utils/validation.js';
 import { errorMessage } from './utils/errors.js';
 
 const mediaDirectory = path.resolve(path.dirname(env.databasePath), 'uploads');
@@ -82,6 +85,45 @@ app.get('/media/:id', requireAuth, (req, res) => {
   const disposition = media.type.startsWith('image/') || media.type.startsWith('video/') || media.type.startsWith('audio/') ? 'inline' : 'attachment';
   res.set({ 'Content-Type': media.type, 'Content-Length': String(media.size), 'Content-Disposition': `${disposition}; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(media.name)}`, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, no-store' });
   res.sendFile(filePath, (error) => { if (error && !res.headersSent) res.sendStatus((error as NodeJS.ErrnoException).code === 'ENOENT' ? 404 : 500); });
+});
+
+const allowedAvatarTypes = new Set(Object.keys(avatarExtensions));
+
+app.post('/profile/avatar', requireTrustedOrigin, requireAuth, express.raw({ type: 'application/octet-stream', limit: '2mb' }), (req, res) => {
+  const type = String(req.get('x-file-type') || '').split(';')[0].trim().toLowerCase();
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'The selected image is empty.' });
+  if (req.body.length > 2 * 1024 * 1024) return res.status(413).json({ error: 'Avatars must be 2 MB or smaller.' });
+  if (!allowedAvatarTypes.has(type) || !matchesAvatarType(req.body, type)) return res.status(400).json({ error: 'Avatars must be a JPEG, PNG, GIF or WebP image.' });
+
+  const username = req.user!.username;
+  const existing = UserModel.findByUsername(username);
+  deleteAvatarFile(username, existing?.avatar_type || null);
+  const version = (existing?.avatar_version || 0) + 1;
+  try {
+    fs.writeFileSync(avatarPath(username, type), req.body);
+    UserModel.setAvatar(username, version, type);
+    res.status(201).json({ avatarVersion: version, avatarType: type });
+  } catch (error) {
+    console.error('[profile] avatar upload failed:', errorMessage(error));
+    res.status(500).json({ error: 'The avatar could not be uploaded.' });
+  }
+});
+
+app.get('/profile/avatar/:username', requireAuth, (req, res) => {
+  const parsed = safeParse(usernameOnlySchema, req.params.username);
+  if (!parsed.ok) return res.sendStatus(404);
+  const user = UserModel.findByUsername(parsed.data);
+  if (!user || !user.avatar_type) return res.sendStatus(404);
+  res.set({ 'Content-Type': user.avatar_type, 'Cache-Control': 'private, max-age=300', 'X-Content-Type-Options': 'nosniff' });
+  res.sendFile(avatarPath(user.username, user.avatar_type), (error) => { if (error && !res.headersSent) res.sendStatus((error as NodeJS.ErrnoException).code === 'ENOENT' ? 404 : 500); });
+});
+
+app.get('/profile/:username', requireAuth, (req, res) => {
+  const parsed = safeParse(usernameOnlySchema, req.params.username);
+  if (!parsed.ok) return res.status(404).json({ error: 'User not found' });
+  const user = UserModel.findByUsername(parsed.data);
+  if (!user || user.status !== 'approved') return res.status(404).json({ error: 'User not found' });
+  res.json({ username: user.username, role: user.role, bio: user.bio, createdAt: user.created_at, hasAvatar: Boolean(user.avatar_type), avatarVersion: user.avatar_version });
 });
 
 const server = http.createServer(app);

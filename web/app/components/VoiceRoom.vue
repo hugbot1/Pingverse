@@ -1,20 +1,49 @@
 <template>
   <section class="voice-room-panel" :class="{ hidden: !panelVisible }" aria-label="Voice room">
-    <div class="voice-room-heading"><strong>{{ panelTitle }}</strong><span aria-live="polite">{{ statusText }}</span></div>
+    <div class="voice-room-heading"><strong>{{ panelTitle }}</strong><span aria-live="polite">{{ statusText }}</span>
+    </div>
     <div class="voice-room-participants">
-      <div v-if="activeConversation" class="voice-participant-card" :class="{ speaking: localSpeaking && !muted && !forcedMuted }">
-        <span class="voice-participant-name">{{ username }} (you)</span><span class="voice-participant-activity">{{ forcedMuted ? 'Muted by admin' : muted ? 'Muted' : 'Microphone on' }}</span>
-        <div class="voice-participant-menu"><button type="button" @click="toggleMenu('local')">Controls</button><div v-if="openMenuId === 'local'" class="voice-participant-controls"><button class="btn-ghost-accent voice-local-mute" :disabled="!localStream || forcedMuted" @click="toggleSelfMute">{{ forcedMuted ? 'Muted by admin' : muted ? 'Unmute microphone' : 'Mute microphone' }}</button></div></div>
+      <div v-if="activeConversation" class="voice-participant-card"
+        :class="{ speaking: localSpeaking && !muted && !forcedMuted }">
+        <span class="voice-participant-name">{{ username }} (you)</span><span class="voice-participant-activity">{{
+          forcedMuted ? 'Muted by admin' : muted ? 'Muted' : 'Microphone on' }}</span>
+        <div class="voice-participant-menu"><button type="button" @click="toggleMenu('local')">Controls</button>
+          <div v-if="openMenuId === 'local'" class="voice-participant-controls"><button
+              class="btn-ghost-accent voice-local-mute" :disabled="!localStream || forcedMuted"
+              @click="toggleSelfMute">{{ forcedMuted ? 'Muted by admin' : muted ? 'Unmute microphone' : 'Mute
+              microphone' }}</button></div>
+        </div>
       </div>
-      <div v-for="[id, info] in peerInfo" :key="id" class="voice-participant-card" :class="{ speaking: info.speaking && !info.adminMuted }">
-        <div class="voice-participant-identity"><span class="voice-participant-name">{{ info.username }}</span><span class="voice-participant-activity">{{ info.adminMuted ? 'Muted by admin' : info.localMuted ? 'Muted for you' : 'Connected' }}</span></div>
-        <div class="voice-participant-menu"><button type="button" @click="toggleMenu(id)">Controls</button><div v-if="openMenuId === id" class="voice-participant-controls"><button class="btn-ghost-accent voice-local-mute" :aria-pressed="String(info.localMuted)" @click="togglePeerMute(info)">{{ info.localMuted ? 'Unmute for me' : 'Mute for me' }}</button><label class="voice-volume-label">Volume<input v-model.number="info.volumePercent" class="voice-volume" type="range" min="0" max="100" :aria-label="`${info.username} volume`" @input="applyAudioPolicy(info)"></label><button v-if="role === 'admin' && info.username !== username" class="btn-ghost-accent voice-admin-mute" @click="moderateMute(info)">{{ info.adminMuted ? 'Unmute for everyone' : 'Mute for everyone' }}</button></div></div>
+      <div v-for="[id, info] in peerInfo" :key="id" class="voice-participant-card"
+        :class="{ speaking: info.speaking && !info.adminMuted }">
+        <div class="voice-participant-identity"><span class="voice-participant-name">{{ info.username }}</span><span
+            class="voice-participant-activity">{{ info.adminMuted ? 'Muted by admin' : info.localMuted ? 'Muted for you'
+              : 'Connected' }}</span></div>
+        <div class="voice-participant-menu"><button type="button" @click="toggleMenu(id)">Controls</button>
+          <div v-if="openMenuId === id" class="voice-participant-controls"><button
+              class="btn-ghost-accent voice-local-mute" :aria-pressed="String(info.localMuted)"
+              @click="togglePeerMute(info)">{{ info.localMuted ? 'Unmute for me' : 'Mute for me' }}</button><label
+              class="voice-volume-label">Volume<input v-model.number="info.volumePercent" class="voice-volume"
+                type="range" min="0" max="100" :aria-label="`${info.username} volume`"
+                @input="applyAudioPolicy(info)"></label><button v-if="role === 'admin' && info.username !== username"
+              class="btn-ghost-accent voice-admin-mute" @click="moderateMute(info)">{{ info.adminMuted ? 'Unmute for
+              everyone' : 'Mute for everyone' }}</button></div>
+        </div>
       </div>
     </div>
   </section>
-  <div class="voice-presence" :class="{ hidden: !visibleRooms.length }" aria-label="People currently in visible voice rooms"><div class="voice-presence-users">
-    <div v-for="room in visibleRooms" :key="room.to" class="voice-presence-group"><span class="voice-presence-label">{{ room.to === 'global' ? 'Global Voice' : `${room.to} Voice` }}</span><span v-for="person in room.participants" :key="person.username" class="voice-presence-user" :class="{ 'admin-muted': person.adminMuted }" :title="`${person.username}${person.adminMuted ? ' · Muted by admin' : ''}`"><span class="voice-presence-name">{{ person.username }}</span><span v-if="person.adminMuted" class="voice-presence-muted">Muted</span></span></div>
-  </div></div>
+  <div class="voice-presence" :class="{ hidden: !visibleRooms.length }"
+    aria-label="People currently in visible voice rooms">
+    <div class="voice-presence-users">
+      <div v-for="room in visibleRooms" :key="room.to" class="voice-presence-group"><span
+          class="voice-presence-label">{{ room.to === 'global' ? 'Global Voice' : `${room.to} Voice` }}</span><span
+          v-for="person in room.participants" :key="person.username" class="voice-presence-user"
+          :class="{ 'admin-muted': person.adminMuted }"
+          :title="`${person.username}${person.adminMuted ? ' · Muted by admin' : ''}`"><span
+            class="voice-presence-name">{{ person.username }}</span><span v-if="person.adminMuted"
+            class="voice-presence-muted">Muted</span></span></div>
+    </div>
+  </div>
   <p v-if="errorText" class="voice-error" role="status">{{ errorText }}</p>
 </template>
 
@@ -64,7 +93,7 @@ function soundMeter(stream) {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass) throw new Error('Audio level detection is unavailable.');
   audioContext ||= new AudioContextClass();
-  if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+  if (audioContext.state === 'suspended') audioContext.resume().catch(() => { });
   const analyser = audioContext.createAnalyser();
   analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.55;
   audioContext.createMediaStreamSource(stream).connect(analyser);
@@ -115,7 +144,7 @@ function removePeer(id) {
 
 async function playIncomingChunk(id, info, arrayBuffer) {
   if (!audioContext || !arrayBuffer) return;
-  if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+  if (audioContext.state === 'suspended') audioContext.resume().catch(() => { });
 
   let buffer;
   try { buffer = await audioContext.decodeAudioData(arrayBuffer.slice(0)); }
@@ -188,7 +217,7 @@ async function toggleVoice() {
     return;
   }
   joining.value = true; errorText.value = ''; statusText.value = 'Waiting for microphone permission…';
-  try { audioContext ||= new (window.AudioContext || window.webkitAudioContext)(); audioContext.resume().catch(() => {}); } catch { /* try */ }
+  try { audioContext ||= new (window.AudioContext || window.webkitAudioContext)(); audioContext.resume().catch(() => { }); } catch { /* try */ }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     if (!joining.value || room !== props.conversation || socket !== props.socket || !socket.connected) { stream.getTracks().forEach((track) => track.stop()); joining.value = false; return; }
@@ -219,7 +248,7 @@ function cleanup(notifyServer) {
   for (const id of [...peerInfo.keys()]) removePeer(id);
   peerInfo.clear(); peerPlayback.clear(); clearInterval(meterTimer); meterTimer = null; localAnalyser.value = null;
   for (const track of localStream.value?.getTracks() || []) track.stop();
-  localStream.value = null; audioContext?.close().catch(() => {}); audioContext = null;
+  localStream.value = null; audioContext?.close().catch(() => { }); audioContext = null;
   activeConversation.value = null; activeSocket.value = null; muted.value = false; forcedMuted.value = false; joining.value = false; openMenuId.value = null;
 }
 function leaveVoice() { cleanup(true); statusText.value = ''; errorText.value = ''; }

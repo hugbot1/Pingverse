@@ -19,7 +19,10 @@ db.exec(`
     role          TEXT NOT NULL DEFAULT 'user',
     status        TEXT NOT NULL DEFAULT 'approved',
     muted_until   INTEGER,
-    created_at    INTEGER NOT NULL
+    created_at    INTEGER NOT NULL,
+    bio           TEXT NOT NULL DEFAULT '',
+    avatar_version INTEGER NOT NULL DEFAULT 0,
+    avatar_type   TEXT
   );
 
   CREATE TABLE IF NOT EXISTS messages (
@@ -106,6 +109,16 @@ if (!messageColumns.some((column) => column.name === 'reactions')) {
       // ignore
     }
   }
+}
+
+if (!userColumns.some((column) => column.name === 'bio')) {
+  db.exec(`ALTER TABLE users ADD COLUMN bio TEXT NOT NULL DEFAULT ''`);
+}
+if (!userColumns.some((column) => column.name === 'avatar_version')) {
+  db.exec(`ALTER TABLE users ADD COLUMN avatar_version INTEGER NOT NULL DEFAULT 0`);
+}
+if (!userColumns.some((column) => column.name === 'avatar_type')) {
+  db.exec(`ALTER TABLE users ADD COLUMN avatar_type TEXT`);
 }
 
 export function closeDb(): void {

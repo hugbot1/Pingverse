@@ -8,10 +8,13 @@ export type UserRecord = {
   status: string;
   muted_until: number | null;
   created_at: number;
+  bio: string;
+  avatar_version: number;
+  avatar_type: string | null;
 };
 
 export type UserListing = Pick<UserRecord, 'username' | 'role' | 'status' | 'muted_until' | 'created_at'>;
-export type ApprovedUser = Pick<UserRecord, 'username' | 'role' | 'muted_until'>;
+export type ApprovedUser = Pick<UserRecord, 'username' | 'role' | 'muted_until' | 'avatar_version' | 'avatar_type'>;
 
 const insertUser = db.prepare(
   `INSERT INTO users (username, hash, role, status, created_at) VALUES (@username, @hash, @role, @status, @created_at)`
@@ -21,7 +24,7 @@ const listAll = db.prepare(
   `SELECT username, role, status, muted_until, created_at FROM users ORDER BY created_at ASC`
 );
 const listApproved = db.prepare(
-  `SELECT username, role, muted_until FROM users WHERE status = 'approved'`
+  `SELECT username, role, muted_until, avatar_version, avatar_type FROM users WHERE status = 'approved'`
 );
 const countPending = db.prepare(`SELECT COUNT(*) AS n FROM users WHERE status = 'pending'`);
 const updateStatus = db.prepare(`UPDATE users SET status = ? WHERE username = ?`);
@@ -30,6 +33,8 @@ const updateMutedUntil = db.prepare(`UPDATE users SET muted_until = ? WHERE user
 const updateCredentials = db.prepare(
   `UPDATE users SET username = COALESCE(@newUsername, username), hash = COALESCE(@newHash, hash) WHERE username = @currentUsername`
 );
+const updateBio = db.prepare(`UPDATE users SET bio = ? WHERE username = ?`);
+const updateAvatar = db.prepare(`UPDATE users SET avatar_version = ?, avatar_type = ? WHERE username = ?`);
 const deleteByUsername = db.prepare(`DELETE FROM users WHERE username = ?`);
 
 export const UserModel = {
@@ -79,6 +84,18 @@ export const UserModel = {
       newUsername: newUsername || null,
       newHash: newHash || null,
     });
+  },
+
+  setBio(username: string, bio: string): void {
+    updateBio.run(bio, username);
+  },
+
+  setAvatar(username: string, version: number, type: string): void {
+    updateAvatar.run(version, type, username);
+  },
+
+  clearAvatar(username: string): void {
+    updateAvatar.run(0, null, username);
   },
 
   deleteByUsername(username: string): void {

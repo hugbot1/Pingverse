@@ -56,16 +56,17 @@
             <tr v-for="user in approved" :key="user.username">
               <td>{{ user.username }}</td>
               <td><span class="tag" :class="{ admin: user.role === 'admin' }">{{ user.role === 'admin' ? 'Owner/Admin' :
-                  'User' }}</span></td>
+                'User' }}</span></td>
               <td><span class="tag" :class="{ warn: isTimedOut(user) }">{{ isTimedOut(user) ? `Timed out until ${new
-                Date(user.mutedUntil).toLocaleTimeString() }` : 'Active' }}</span></td>
+                Date(user.mutedUntil).toLocaleTimeString()}` : 'Active' }}</span></td>
               <td>{{ formatTime(user.createdAt) }}</td>
               <td><span v-if="user.role === 'admin'" class="tag">Protected</span>
                 <div v-else class="cell-actions"><button class="small-btn neutral"
                     @click="timeout(user.username)">Timeout</button><button v-if="isTimedOut(user)"
                     class="small-btn neutral"
                     @click="run(() => api.post('/admin/users/untimeout', { username: user.username }))">End
-                    Timeout</button><button class="small-btn danger" @click="deleteUser(user.username)">Delete</button>
+                    Timeout</button><button class="small-btn neutral" @click="resetProfile(user.username)">Reset
+                    Profile</button><button class="small-btn danger" @click="deleteUser(user.username)">Delete</button>
                 </div>
               </td>
             </tr>
@@ -197,6 +198,10 @@ function timeout(username) {
   const mins = Number.parseInt(answer, 10);
   if (Number.isNaN(mins) || mins < 1 || mins > 10080) return window.alert('Enter a whole number of minutes between 1 and 10080.');
   run(() => api.post('/admin/users/timeout', { username, mins }));
+}
+
+function resetProfile(username) {
+  if (confirm(`Clear "${username}"'s avatar and bio?`)) run(() => api.post('/admin/users/reset-profile', { username }));
 }
 
 function deleteUser(username) {

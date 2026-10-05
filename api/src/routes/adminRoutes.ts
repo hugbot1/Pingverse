@@ -4,6 +4,7 @@ import { UserModel, type UserRecord } from '../models/userModel.js';
 import { MessageModel } from '../models/messageModel.js';
 import { AnnouncementModel } from '../models/announcementModel.js';
 import { AuditModel } from '../models/auditModel.js';
+import { deleteAvatarFile } from '../utils/avatarStore.js';
 import { presence } from '../sockets/presence.js';
 import type { AppServer } from '../sockets/types.js';
 import { requireAdmin } from '../middleware/auth.js';
@@ -135,6 +136,16 @@ export function createAdminRouter(io: AppServer) {
     }
     io.emit('user purged', name);
     io.emit('status change');
+    res.json({ ok: true });
+  });
+
+  router.post('/users/reset-profile', (req, res) => {
+    const found = loadTarget(req, res, adminUserSchema);
+    if (!found) return;
+    deleteAvatarFile(found.user.username, found.user.avatar_type);
+    UserModel.clearAvatar(found.user.username);
+    UserModel.setBio(found.user.username, '');
+    audit(req, 'reset_profile', found.user.username);
     res.json({ ok: true });
   });
 
