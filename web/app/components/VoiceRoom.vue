@@ -1,6 +1,6 @@
 <template>
   <section class="voice-room-panel" :class="{ hidden: !panelVisible }" aria-label="Voice room">
-    <div class="voice-room-heading"><strong>{{ panelTitle }}</strong><span aria-live="polite">{{ statusText }}</span></div>
+    <div class="voice-room-heading"><strong>{{ panelTitle }}</strong><span aria-live="polite">{{ statusText }}</span><template v-if="activeConversation"><button type="button" class="btn-ghost-accent voice-video-btn" :aria-pressed="String(localKinds.includes('camera'))" @click="toggleVideo('camera')">{{ localKinds.includes('camera') ? 'Stop camera' : 'Camera' }}</button><button v-if="canShareScreen" type="button" class="btn-ghost-accent voice-video-btn" :aria-pressed="String(localKinds.includes('screen'))" @click="toggleVideo('screen')">{{ localKinds.includes('screen') ? 'Stop sharing' : 'Share screen' }}</button></template></div>
     <div class="voice-room-participants">
       <div v-if="activeConversation" class="voice-participant-card" :class="{ speaking: localSpeaking && !muted && !forcedMuted }">
         <span class="voice-participant-name">{{ username }} (you)</span><span class="voice-participant-activity">{{ forcedMuted ? 'Muted by admin' : muted ? 'Muted' : 'Microphone on' }}</span>
@@ -9,6 +9,16 @@
       <div v-for="[id, info] in peerInfo" :key="id" class="voice-participant-card" :class="{ speaking: info.speaking && !info.adminMuted }">
         <div class="voice-participant-identity"><span class="voice-participant-name">{{ info.username }}</span><span class="voice-participant-activity">{{ info.adminMuted ? 'Muted by admin' : info.localMuted ? 'Muted for you' : 'Connected' }}</span></div>
         <div class="voice-participant-menu"><button type="button" @click="toggleMenu(id)">Controls</button><div v-if="openMenuId === id" class="voice-participant-controls"><button class="btn-ghost-accent voice-local-mute" :aria-pressed="String(info.localMuted)" @click="togglePeerMute(info)">{{ info.localMuted ? 'Unmute for me' : 'Mute for me' }}</button><label class="voice-volume-label">Volume<input v-model.number="info.volumePercent" class="voice-volume" type="range" min="0" max="100" :aria-label="`${info.username} volume`" @input="applyAudioPolicy(info)"></label><button v-if="role === 'admin' && info.username !== username" class="btn-ghost-accent voice-admin-mute" @click="moderateMute(info)">{{ info.adminMuted ? 'Unmute for everyone' : 'Mute for everyone' }}</button></div></div>
+      </div>
+    </div>
+    <div v-if="localKinds.length || remoteTiles.size" class="voice-video-grid">
+      <div v-for="kind in localKinds" :key="`local:${kind}`" class="voice-video-tile" :class="{ enlarged: expandedKey === `local:${kind}` }" @click="toggleExpand(`local:${kind}`)">
+        <video :ref="(el) => bindLocalVideo(el, kind)" muted autoplay playsinline />
+        <span class="voice-video-label">Your {{ kindLabel(kind) }}</span>
+      </div>
+      <div v-for="[key, tile] in remoteTiles" :key="key" class="voice-video-tile" :class="{ enlarged: expandedKey === key }" @click="toggleExpand(key)">
+        <canvas :ref="(el) => registerCanvas(key, el)" />
+        <span class="voice-video-label">{{ tile.username }}'s {{ kindLabel(tile.kind) }}</span>
       </div>
     </div>
   </section>
@@ -24,6 +34,13 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 const CHUNK_MS = 250;
 const MAX_PLAYBACK_LEAD_SECONDS = 1.5;
 const SPEAKING_RMS_THRESHOLD = 0.02;
+const VIDEO_KINDS = ['camera', 'screen'];
+const VIDEO_PROFILES = {
+  camera: { maxWidth: 640, interval: 33, quality: 0.6 },
+  screen: { maxWidth: 1280, interval: 33, quality: 0.6 },
+};
+const MAX_VIDEO_FRAME_BYTES = 800 * 1024;
+const MIN_VIDEO_QUALITY = 0.5;
 
 const props = defineProps({ socket: Object, conversation: { type: String, default: 'global' }, username: { type: String, default: '' }, role: { type: String, default: 'user' } });
 const peerInfo = reactive(new Map());
@@ -39,6 +56,14 @@ const forcedMuted = ref(false);
 const joining = ref(false);
 const errorText = ref('');
 const openMenuId = ref(null);
+const remoteTiles = reactive(new Map());
+const localKinds = ref([]);
+const expandedKey = ref('');
+const canShareScreen = ref(false);
+const tileCanvases = new Map();
+const latestFrames = new Map();
+const sources = {};
+const pendingVideo = new Set();
 let audioContext = null;
 let meterTimer = null;
 let typingSamples;
@@ -110,8 +135,101 @@ function removePeer(id) {
   }
   peerInfo.delete(id);
   peerPlayback.delete(id);
+  for (const key of [...remoteTiles.keys()]) if (key.startsWith(`${id}:`)) removeTile(key);
   if (activeConversation.value) updateStatus();
 }
+
+function kindLabel(kind) { return kind === 'screen' ? 'Screen' : 'Camera'; }
+function toggleExpand(key) { expandedKey.value = expandedKey.value === key ? '' : key; }
+
+function drawTile(key) {
+  const canvas = tileCanvases.get(key);
+  const bitmap = latestFrames.get(key);
+  if (!canvas || !bitmap) return;
+  if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) { canvas.width = bitmap.width; canvas.height = bitmap.height; }
+  canvas.getContext('2d').drawImage(bitmap, 0, 0);
+}
+
+function registerCanvas(key, el) {
+  if (!el) { tileCanvases.delete(key); return; }
+  if (tileCanvases.get(key) === el) return;
+  tileCanvases.set(key, el);
+  drawTile(key);
+}
+
+function removeTile(key) {
+  remoteTiles.delete(key);
+  latestFrames.get(key)?.close();
+  latestFrames.delete(key);
+  tileCanvases.delete(key);
+  if (expandedKey.value === key) expandedKey.value = '';
+}
+
+function bindLocalVideo(el, kind) {
+  const source = sources[kind];
+  if (!source) return;
+  if (!el) { source.video = null; return; }
+  source.video = el;
+  if (el.srcObject !== source.stream) el.srcObject = source.stream;
+}
+
+async function captureFrame(kind, source) {
+  const video = source.video;
+  if (source.busy || !video || !video.videoWidth || sources[kind] !== source) return;
+  source.busy = true;
+  try {
+    const scale = Math.min(1, VIDEO_PROFILES[kind].maxWidth / video.videoWidth);
+    const width = Math.round(video.videoWidth * scale);
+    const height = Math.round(video.videoHeight * scale);
+    const canvas = source.canvas;
+    if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+    canvas.getContext('2d').drawImage(video, 0, 0, width, height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', source.quality));
+    if (!blob || sources[kind] !== source) return;
+    if (blob.size > MAX_VIDEO_FRAME_BYTES) { source.quality = Math.max(MIN_VIDEO_QUALITY, source.quality - 0.1); return; }
+    const buffer = await blob.arrayBuffer();
+    if (sources[kind] === source) activeSocket.value?.volatile.emit('voice video', kind, buffer);
+  } catch { return; }
+  finally { source.busy = false; }
+}
+
+function stopVideo(kind, notify = true) {
+  const source = sources[kind];
+  if (!source) return;
+  delete sources[kind];
+  clearInterval(source.timer);
+  for (const track of source.stream.getTracks()) { track.onended = null; track.stop(); }
+  localKinds.value = localKinds.value.filter((value) => value !== kind);
+  const key = `local:${kind}`;
+  if (expandedKey.value === key) expandedKey.value = '';
+  if (notify && activeSocket.value?.connected) activeSocket.value.emit('voice video stop', kind);
+}
+
+async function startVideo(kind) {
+  if (!activeConversation.value || sources[kind] || pendingVideo.has(kind)) return;
+  const socket = activeSocket.value;
+  const room = activeConversation.value;
+  const devices = navigator.mediaDevices;
+  if (!(kind === 'camera' ? devices?.getUserMedia : devices?.getDisplayMedia)) { errorText.value = kind === 'camera' ? 'This browser cannot access a camera.' : 'This browser cannot share your screen.'; return; }
+  pendingVideo.add(kind);
+  errorText.value = '';
+  try {
+    const stream = kind === 'camera'
+      ? await devices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }, audio: false })
+      : await devices.getDisplayMedia({ video: { frameRate: { ideal: 30 } }, audio: false });
+    if (activeConversation.value !== room || activeSocket.value !== socket) { stream.getTracks().forEach((track) => track.stop()); return; }
+    const source = { stream, video: null, canvas: document.createElement('canvas'), quality: VIDEO_PROFILES[kind].quality, busy: false, timer: null };
+    sources[kind] = source;
+    for (const track of stream.getVideoTracks()) track.onended = () => { if (sources[kind] === source) stopVideo(kind); };
+    localKinds.value = [...localKinds.value, kind];
+    source.timer = setInterval(() => captureFrame(kind, source), VIDEO_PROFILES[kind].interval);
+  } catch (error) {
+    if (error?.name === 'NotAllowedError') errorText.value = kind === 'camera' ? 'Allow camera access in your browser to share video.' : 'Screen sharing was cancelled or blocked.';
+    else errorText.value = kind === 'camera' ? 'Could not start your camera. Check that it is connected and available.' : 'Could not start screen sharing.';
+  } finally { pendingVideo.delete(kind); }
+}
+
+function toggleVideo(kind) { if (sources[kind]) stopVideo(kind); else startVideo(kind); }
 
 async function playIncomingChunk(id, info, arrayBuffer) {
   if (!audioContext || !arrayBuffer) return;
@@ -217,6 +335,9 @@ function cleanup(notifyServer) {
   recordGeneration += 1;
   if (notifyServer && activeSocket.value?.connected) activeSocket.value.emit('voice leave');
   for (const id of [...peerInfo.keys()]) removePeer(id);
+  for (const kind of Object.keys(sources)) stopVideo(kind, false);
+  for (const bitmap of latestFrames.values()) bitmap.close();
+  latestFrames.clear(); tileCanvases.clear(); remoteTiles.clear(); expandedKey.value = '';
   peerInfo.clear(); peerPlayback.clear(); clearInterval(meterTimer); meterTimer = null; localAnalyser.value = null;
   for (const track of localStream.value?.getTracks() || []) track.stop();
   localStream.value = null; audioContext?.close().catch(() => {}); audioContext = null;
@@ -239,20 +360,34 @@ function onForcedMute({ muted: isMuted }) {
   statusText.value = isMuted ? 'An admin muted your microphone.' : 'You have been unmuted.';
 }
 function onLeft({ id }) { removePeer(id); }
+async function onVideo({ from, kind, username: name, frame }) {
+  if (!activeConversation.value || !from || from === props.socket?.id || !VIDEO_KINDS.includes(kind)) return;
+  if (!(frame instanceof ArrayBuffer) && !ArrayBuffer.isView(frame)) return;
+  const key = `${from}:${kind}`;
+  if (!remoteTiles.has(key)) remoteTiles.set(key, { id: from, kind, username: name || peerInfo.get(from)?.username || 'User' });
+  let bitmap;
+  try { bitmap = await createImageBitmap(new Blob([frame], { type: 'image/jpeg' })); }
+  catch { return; }
+  if (!remoteTiles.has(key)) { bitmap.close(); return; }
+  latestFrames.get(key)?.close();
+  latestFrames.set(key, bitmap);
+  drawTile(key);
+}
+function onVideoStop({ from, kind }) { removeTile(`${from}:${kind}`); }
 function onDisconnect() { cleanup(false); }
 function attachSocket(socket) {
   if (!socket) return;
   socket.on('voice presence', onPresence); socket.on('voice participant joined', onJoined); socket.on('voice participant left', onLeft);
-  socket.on('voice audio', onAudio); socket.on('voice moderation update', onModeration); socket.on('voice forced mute', onForcedMute); socket.on('disconnect', onDisconnect);
+  socket.on('voice audio', onAudio); socket.on('voice video', onVideo); socket.on('voice video stop', onVideoStop); socket.on('voice moderation update', onModeration); socket.on('voice forced mute', onForcedMute); socket.on('disconnect', onDisconnect);
   refreshPresence();
 }
 function detachSocket(socket) {
   if (!socket) return;
   socket.off('voice presence', onPresence); socket.off('voice participant joined', onJoined); socket.off('voice participant left', onLeft);
-  socket.off('voice audio', onAudio); socket.off('voice moderation update', onModeration); socket.off('voice forced mute', onForcedMute); socket.off('disconnect', onDisconnect);
+  socket.off('voice audio', onAudio); socket.off('voice video', onVideo); socket.off('voice video stop', onVideoStop); socket.off('voice moderation update', onModeration); socket.off('voice forced mute', onForcedMute); socket.off('disconnect', onDisconnect);
 }
 watch(() => props.socket, (socket, previous) => { detachSocket(previous); attachSocket(socket); });
-onMounted(refreshPresence);
+onMounted(() => { canShareScreen.value = Boolean(navigator.mediaDevices?.getDisplayMedia); refreshPresence(); });
 onBeforeUnmount(() => { cleanup(true); detachSocket(props.socket); });
 defineExpose({ activeConversation, joining, toggleVoice });
 </script>

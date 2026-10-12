@@ -5,10 +5,13 @@ import type { Ack, AppServer, AppSocket } from '../types.js';
 
 const MAX_ROOM_SIZE = 8;
 const MAX_AUDIO_CHUNK_BYTES = 32 * 1024;
+const MAX_VIDEO_FRAME_BYTES = 800 * 1024;
+const VIDEO_KINDS = new Set(['camera', 'screen']);
 const adminMutedUsers = new Map<string, Set<string>>();
 const roomDetails = new Map<string, { conversation: string; members: Set<string> }>();
 
 const audioRateLimiter = createSocketRateLimiter({ windowMs: 2000, max: 16 });
+const videoRateLimiter = createSocketRateLimiter({ windowMs: 1000, max: 36 });
 
 function mutedUsersFor(key: string) {
   let users = adminMutedUsers.get(key);
@@ -136,6 +139,22 @@ export function registerVoiceHandlers(io: AppServer, socket: AppSocket) {
     if (mutedUsersFor(room.key).has(socket.user.username)) return;
 
     socket.to(room.key).emit('voice audio', { from: socket.id, username: socket.user.username, chunk });
+  });
+
+  socket.on('voice video', (kind: unknown, frame: unknown) => {
+    const room = socket.data.voiceRoom;
+    if (!room || typeof kind !== 'string' || !VIDEO_KINDS.has(kind)) return;
+    if (!Buffer.isBuffer(frame) || frame.length < 4 || frame.length > MAX_VIDEO_FRAME_BYTES) return;
+    if (frame[0] !== 0xff || frame[1] !== 0xd8 || frame[2] !== 0xff) return;
+    if (!videoRateLimiter(`${socket.user.username}:${kind}`)) return;
+
+    socket.to(room.key).volatile.emit('voice video', { from: socket.id, kind, username: socket.user.username, frame });
+  });
+
+  socket.on('voice video stop', (kind: unknown) => {
+    const room = socket.data.voiceRoom;
+    if (!room || typeof kind !== 'string' || !VIDEO_KINDS.has(kind)) return;
+    socket.to(room.key).emit('voice video stop', { from: socket.id, kind });
   });
 
   socket.on('disconnect', () => leaveVoiceRoom(io, socket));
