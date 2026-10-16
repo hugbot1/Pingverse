@@ -38,6 +38,7 @@ db.exec(`
     is_read       INTEGER NOT NULL DEFAULT 0,
     yeahs         TEXT NOT NULL DEFAULT '[]',
     reactions     TEXT NOT NULL DEFAULT '{}',
+    poll          TEXT,
     ts            INTEGER NOT NULL
   );
 
@@ -83,6 +84,21 @@ db.exec(`
     detail        TEXT,
     ts            INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS user_blocks (
+    blocker    TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE ON UPDATE CASCADE,
+    blocked    TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE ON UPDATE CASCADE,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (blocker, blocked)
+  );
+  CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks (blocked);
+
+  CREATE TABLE IF NOT EXISTS saved_users (
+    owner      TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE ON UPDATE CASCADE,
+    saved      TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE ON UPDATE CASCADE,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (owner, saved)
+  );
 `);
 
 const userColumns = db.prepare(`PRAGMA table_info(users)`).all() as unknown as { name: string }[];
@@ -96,6 +112,9 @@ if (!messageColumns.some((column) => column.name === 'attachments')) {
 }
 if (!messageColumns.some((column) => column.name === 'forwarded_from')) {
   db.exec(`ALTER TABLE messages ADD COLUMN forwarded_from TEXT`);
+}
+if (!messageColumns.some((column) => column.name === 'poll')) {
+  db.exec(`ALTER TABLE messages ADD COLUMN poll TEXT`);
 }
 if (!messageColumns.some((column) => column.name === 'reactions')) {
   db.exec(`ALTER TABLE messages ADD COLUMN reactions TEXT NOT NULL DEFAULT '{}'`);

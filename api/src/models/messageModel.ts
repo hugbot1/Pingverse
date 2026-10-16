@@ -13,6 +13,7 @@ type MessageRow = {
   is_read: number;
   yeahs: string;
   reactions: string;
+  poll: string | null;
   pinned_by?: string | null;
   pinned_at?: number | null;
   saved_message_id?: number | null;
@@ -27,6 +28,8 @@ export type Attachment = { id: string; name: string; type: string; size: number 
 export type ReplyTo = { id: MessageId; user: string; text: string };
 export type ForwardedFrom = { user: string };
 export type PinInfo = { pinned_by: string; pinned_at: number };
+export type PollOption = { text: string; votes: string[] };
+export type Poll = { question: string; options: PollOption[]; multi: boolean; closed: boolean };
 
 export type Message = {
   id: string;
@@ -41,6 +44,7 @@ export type Message = {
   read: boolean;
   yeahs: string[];
   reactions: Record<string, string[]>;
+  poll: Poll | null;
   pinned: boolean;
   pinnedBy: string | null;
   pinnedAt: number | null;
@@ -57,6 +61,7 @@ export type CreateMessageInput = {
   to?: string;
   replyTo?: ReplyTo | null;
   forwardedFrom?: ForwardedFrom | null;
+  poll?: Poll | null;
 };
 
 export type SearchInput = {
@@ -69,8 +74,8 @@ export type SearchInput = {
 };
 
 const insertMessage = db.prepare(`
-  INSERT INTO messages (user, msg, attachments, role, to_user, reply_to, forwarded_from, edited, is_read, yeahs, reactions, ts)
-  VALUES (@user, @msg, @attachments, @role, @to_user, @reply_to, @forwarded_from, 0, 0, '[]', '{}', @ts)
+  INSERT INTO messages (user, msg, attachments, role, to_user, reply_to, forwarded_from, edited, is_read, yeahs, reactions, poll, ts)
+  VALUES (@user, @msg, @attachments, @role, @to_user, @reply_to, @forwarded_from, 0, 0, '[]', '{}', @poll, @ts)
 `);
 
 const findById = db.prepare(`SELECT * FROM messages WHERE id = ?`);
@@ -121,6 +126,7 @@ const findRecentGlobal = db.prepare(`
 
 const updateYeahs = db.prepare(`UPDATE messages SET yeahs = ? WHERE id = ?`);
 const updateReactions = db.prepare(`UPDATE messages SET reactions = ? WHERE id = ?`);
+const updatePoll = db.prepare(`UPDATE messages SET poll = ? WHERE id = ?`);
 const updateEdited = db.prepare(`UPDATE messages SET msg = ?, edited = 1 WHERE id = ?`);
 const deleteGlobal = db.prepare(`DELETE FROM messages WHERE to_user = 'global'`);
 const deleteById = db.prepare(`DELETE FROM messages WHERE id = ?`);
@@ -157,6 +163,7 @@ function serialize(row: MessageRow | undefined): Message | null {
     read: Boolean(row.is_read),
     yeahs: JSON.parse(row.yeahs || '[]'),
     reactions: JSON.parse(row.reactions || '{}'),
+    poll: row.poll ? JSON.parse(row.poll) : null,
     pinned: Boolean(row.pinned_by),
     pinnedBy: row.pinned_by || null,
     pinnedAt: row.pinned_at || null,
@@ -170,7 +177,7 @@ const asRow = (row: unknown) => row as MessageRow | undefined;
 const asRows = (rows: unknown) => rows as MessageRow[];
 
 export const MessageModel = {
-  create({ user, msg, attachments = [], role, to, replyTo, forwardedFrom }: CreateMessageInput): Message {
+  create({ user, msg, attachments = [], role, to, replyTo, forwardedFrom, poll }: CreateMessageInput): Message {
     const info = insertMessage.run({
       user,
       msg,
@@ -179,6 +186,7 @@ export const MessageModel = {
       to_user: to || 'global',
       reply_to: replyTo ? JSON.stringify(replyTo) : null,
       forwarded_from: forwardedFrom ? JSON.stringify(forwardedFrom) : null,
+      poll: poll ? JSON.stringify(poll) : null,
       ts: Date.now(),
     });
     return serialize(asRow(findById.get(info.lastInsertRowid))!);
@@ -264,6 +272,32 @@ export const MessageModel = {
     if (users.length) reactions[emoji] = users;
     else delete reactions[emoji];
     updateReactions.run(JSON.stringify(reactions), id);
+    return serialize(asRow(findById.get(id)));
+  },
+
+  votePoll(id: MessageId, username: string, optionIndex: number): Message | null {
+    const row = findById.get(id) as unknown as { poll: string | null } | undefined;
+    if (!row?.poll) return null;
+    const poll: Poll = JSON.parse(row.poll);
+    const option = poll.options[optionIndex];
+    if (poll.closed || !option) return null;
+    const had = option.votes.includes(username);
+    if (poll.multi) {
+      option.votes = had ? option.votes.filter((voter) => voter !== username) : [...option.votes, username];
+    } else {
+      for (const other of poll.options) other.votes = other.votes.filter((voter) => voter !== username);
+      if (!had) option.votes.push(username);
+    }
+    updatePoll.run(JSON.stringify(poll), id);
+    return serialize(asRow(findById.get(id)));
+  },
+
+  closePoll(id: MessageId): Message | null {
+    const row = findById.get(id) as unknown as { poll: string | null } | undefined;
+    if (!row?.poll) return null;
+    const poll: Poll = JSON.parse(row.poll);
+    poll.closed = true;
+    updatePoll.run(JSON.stringify(poll), id);
     return serialize(asRow(findById.get(id)));
   },
 

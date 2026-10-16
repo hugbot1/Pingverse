@@ -8,10 +8,14 @@ import { MessageModel } from '../models/messageModel.js';
 import { AnnouncementModel } from '../models/announcementModel.js';
 import { presence } from './presence.js';
 import { buildUserList } from './userList.js';
+import { withoutBlocked } from './utils.js';
 import { registerChatHandlers } from './handlers/chatHandlers.js';
 import { registerUserHandlers } from './handlers/userHandlers.js';
 import { registerAccountHandlers } from './handlers/accountHandlers.js';
 import { registerVoiceHandlers } from './handlers/voiceHandlers.js';
+import { registerBlockHandlers } from './handlers/blockHandlers.js';
+import { registerSavedUserHandlers } from './handlers/savedUserHandlers.js';
+import { registerPollHandlers } from './handlers/pollHandlers.js';
 import { errorMessage } from '../utils/errors.js';
 import type { AppServer } from './types.js';
 
@@ -54,7 +58,7 @@ export function createSocketServer(httpServer: http.Server): AppServer {
     socket.emit('announcement', AnnouncementModel.latest());
     socket.emit('presence status', presence.statusOf(name));
 
-    const history = MessageModel.historyForUser(name, 150);
+    const history = withoutBlocked(MessageModel.historyForUser(name, 150), name);
     const self = UserModel.findByUsername(name);
     socket.emit('welcome', {
       username: name,
@@ -70,6 +74,9 @@ export function createSocketServer(httpServer: http.Server): AppServer {
     registerUserHandlers(io, socket);
     registerAccountHandlers(io, socket);
     registerVoiceHandlers(io, socket);
+    registerBlockHandlers(io, socket);
+    registerSavedUserHandlers(io, socket);
+    registerPollHandlers(io, socket);
 
     socket.on('disconnect', () => {
       if (presence.remove(name)) io.emit('status change');

@@ -1,6 +1,7 @@
 import { UserModel } from '../../models/userModel.js';
+import { BlockModel } from '../../models/blockModel.js';
 import { MessageModel, type Attachment, type Message, type PinInfo, type ReplyTo } from '../../models/messageModel.js';
-import { findSocketByUsername } from '../utils.js';
+import { findSocketByUsername, withoutBlocked } from '../utils.js';
 import { createSocketRateLimiter } from '../../utils/socketRateLimiter.js';
 import { errorMessage } from '../../utils/errors.js';
 import type { Ack, AppServer, AppSocket } from '../types.js';
@@ -17,9 +18,12 @@ import {
 
 const chatRateLimiter = createSocketRateLimiter({ windowMs: 10_000, max: 8 });
 
-function broadcastMessage(io: AppServer, socket: AppSocket, entry: Message) {
+export function broadcastMessage(io: AppServer, socket: AppSocket, entry: Message) {
   if (entry.to === 'global') {
-    io.emit('chat message', entry);
+    const hiddenFor = BlockModel.blockersOf(entry.user);
+    for (const connected of io.sockets.sockets.values()) {
+      if (!hiddenFor.has(connected.user.username)) connected.emit('chat message', entry);
+    }
     return;
   }
   const sender = socket.user.username;
@@ -32,11 +36,15 @@ function broadcastMessage(io: AppServer, socket: AppSocket, entry: Message) {
   }
 }
 
-function broadcastUpdate(io: AppServer, _socket: AppSocket, msg: Message) {
+export function broadcastUpdate(io: AppServer, _socket: AppSocket, msg: Message) {
   if (msg.to === 'global') {
-    io.emit('msg updated', msg);
+    const hiddenFor = BlockModel.blockersOf(msg.user);
+    for (const connected of io.sockets.sockets.values()) {
+      if (!hiddenFor.has(connected.user.username)) connected.emit('msg updated', msg);
+    }
     return;
   }
+  if (BlockModel.either(msg.user, msg.to)) return;
   for (const connected of io.sockets.sockets.values()) {
     const username = connected.user?.username;
     if (username === msg.user || username === msg.to) connected.emit('msg updated', msg);
@@ -53,9 +61,13 @@ export function registerChatHandlers(io: AppServer, socket: AppSocket) {
   function broadcastTyping(isTyping: boolean, conversation: string) {
     const event = { username: name, to: conversation, isTyping };
     if (conversation === 'global') {
-      socket.broadcast.emit('typing', event);
+      const hiddenFor = BlockModel.blockersOf(name);
+      for (const recipient of io.sockets.sockets.values()) {
+        if (recipient.id !== socket.id && !hiddenFor.has(recipient.user.username)) recipient.emit('typing', event);
+      }
       return;
     }
+    if (BlockModel.either(name, conversation)) return;
     for (const recipient of io.sockets.sockets.values()) {
       if (recipient.id !== socket.id && recipient.user?.username === conversation) {
         recipient.emit('typing', event);
@@ -78,10 +90,10 @@ export function registerChatHandlers(io: AppServer, socket: AppSocket) {
       const target = parsed.ok && UserModel.findByUsername(parsed.data);
       if (!parsed.ok || !target || target.status !== 'approved' || to === name) return;
     }
-    socket.emit('pinned messages', { to, messages: MessageModel.pinsForConversation(to, name) });
+    socket.emit('pinned messages', { to, messages: withoutBlocked(MessageModel.pinsForConversation(to, name), name) });
   });
 
-  socket.on('get saved messages', () => socket.emit('saved messages', MessageModel.savedForUser(name)));
+  socket.on('get saved messages', () => socket.emit('saved messages', withoutBlocked(MessageModel.savedForUser(name), name)));
 
   socket.on('search messages', (
     data: { to?: string; query?: unknown; author?: unknown; sort?: unknown; requestId?: unknown } = {}
@@ -98,8 +110,9 @@ export function registerChatHandlers(io: AppServer, socket: AppSocket) {
       if (!parsed.ok || !target || target.status !== 'approved' || to === name) return;
     }
     try {
-      const results = MessageModel.search({ username: name, to, query, author, sort, limit: 200 });
-      socket.emit('message search results', { to, requestId: data.requestId, results, limited: results.length === 200 });
+      const found = MessageModel.search({ username: name, to, query, author, sort, limit: 200 });
+      const results = withoutBlocked(found, name);
+      socket.emit('message search results', { to, requestId: data.requestId, results, limited: found.length === 200 });
     } catch {
       socket.emit('error notice', 'Could not search messages.');
     }
@@ -207,6 +220,11 @@ export function registerChatHandlers(io: AppServer, socket: AppSocket) {
       }
     }
 
+    if (to !== 'global' && BlockModel.either(name, to)) {
+      socket.emit('error notice', 'You cannot message this user.');
+      return;
+    }
+
     let replyTo: ReplyTo | null = null;
     if (parsed.data.replyTo) {
       const parent = MessageModel.findById(parsed.data.replyTo.id);
@@ -270,6 +288,7 @@ export function registerChatHandlers(io: AppServer, socket: AppSocket) {
 
     const source = MessageModel.findById(id);
     if (!source) return respond({ ok: false, error: 'That message no longer exists.' });
+    if (source.poll) return respond({ ok: false, error: 'Polls cannot be forwarded.' });
     if (source.to !== 'global' && source.user !== name && source.to !== name) {
       return respond({ ok: false, error: 'You cannot forward that private message.' });
     }
@@ -279,6 +298,10 @@ export function registerChatHandlers(io: AppServer, socket: AppSocket) {
       if (!target || target.status !== 'approved') {
         return respond({ ok: false, error: 'That user does not exist.' });
       }
+    }
+
+    if (to !== 'global' && BlockModel.either(name, to)) {
+      return respond({ ok: false, error: 'You cannot message this user.' });
     }
 
     const forwarded = MessageModel.create({
@@ -326,6 +349,7 @@ export function registerChatHandlers(io: AppServer, socket: AppSocket) {
 
     const existing = MessageModel.findById(parsed.data.id);
     if (!existing || existing.user !== name) return;
+    if (existing.poll) return socket.emit('error notice', 'Polls cannot be edited.');
 
     const updated = MessageModel.editMessage(parsed.data.id, parsed.data.newMsg);
     if (updated) broadcastUpdate(io, socket, updated);

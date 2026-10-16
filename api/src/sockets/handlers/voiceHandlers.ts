@@ -1,4 +1,5 @@
 import { UserModel } from '../../models/userModel.js';
+import { BlockModel } from '../../models/blockModel.js';
 import { usernameOnlySchema, safeParse } from '../../utils/validation.js';
 import { createSocketRateLimiter } from '../../utils/socketRateLimiter.js';
 import type { Ack, AppServer, AppSocket } from '../types.js';
@@ -25,6 +26,17 @@ function mutedUsersFor(key: string) {
 function roomKeyFor(username: string, conversation: string) {
   if (conversation === 'global') return 'voice:global';
   return `voice:dm:${[username, conversation].sort((a, b) => a.localeCompare(b)).map(encodeURIComponent).join(':')}`;
+}
+
+function relayToRoom(io: AppServer, socket: AppSocket, key: string, event: string, payload: Record<string, unknown>, volatile = false) {
+  const hidden = BlockModel.related(socket.user.username);
+  for (const id of io.sockets.adapter.rooms.get(key) || []) {
+    if (id === socket.id) continue;
+    const peer = io.sockets.sockets.get(id);
+    if (!peer || hidden.has(peer.user.username)) continue;
+    if (volatile) peer.volatile.emit(event, payload);
+    else peer.emit(event, payload);
+  }
 }
 
 function leaveVoiceRoom(io: AppServer, socket: AppSocket) {
@@ -61,7 +73,7 @@ function validConversation(name: string, conversation: string) {
   if (conversation === 'global') return true;
   const parsed = safeParse(usernameOnlySchema, conversation);
   const target = parsed.ok && UserModel.findByUsername(parsed.data);
-  return Boolean(parsed.ok && target && target.status === 'approved' && conversation !== name);
+  return Boolean(parsed.ok && target && target.status === 'approved' && conversation !== name && !BlockModel.either(name, conversation));
 }
 
 function sendVoicePresence(io: AppServer, socket: AppSocket, conversation: string) {
@@ -138,7 +150,7 @@ export function registerVoiceHandlers(io: AppServer, socket: AppSocket) {
     if (!audioRateLimiter(socket.user.username)) return;
     if (mutedUsersFor(room.key).has(socket.user.username)) return;
 
-    socket.to(room.key).emit('voice audio', { from: socket.id, username: socket.user.username, chunk });
+    relayToRoom(io, socket, room.key, 'voice audio', { from: socket.id, username: socket.user.username, chunk });
   });
 
   socket.on('voice video', (kind: unknown, frame: unknown) => {
@@ -148,13 +160,13 @@ export function registerVoiceHandlers(io: AppServer, socket: AppSocket) {
     if (frame[0] !== 0xff || frame[1] !== 0xd8 || frame[2] !== 0xff) return;
     if (!videoRateLimiter(`${socket.user.username}:${kind}`)) return;
 
-    socket.to(room.key).volatile.emit('voice video', { from: socket.id, kind, username: socket.user.username, frame });
+    relayToRoom(io, socket, room.key, 'voice video', { from: socket.id, kind, username: socket.user.username, frame }, true);
   });
 
   socket.on('voice video stop', (kind: unknown) => {
     const room = socket.data.voiceRoom;
     if (!room || typeof kind !== 'string' || !VIDEO_KINDS.has(kind)) return;
-    socket.to(room.key).emit('voice video stop', { from: socket.id, kind });
+    relayToRoom(io, socket, room.key, 'voice video stop', { from: socket.id, kind });
   });
 
   socket.on('disconnect', () => leaveVoiceRoom(io, socket));

@@ -3,9 +3,9 @@
     <img src="/assets/logos/logo.png" alt="Pingverse logo" class="logo-img logo-auth">
     <div class="card">
       <div class="tabs">
-        <button class="tab" :class="{ active: mode === 'login' }" type="button" @click="setMode('login')">LOGIN</button>
+        <button class="tab" :class="{ active: mode === 'login' }" type="button" @click="setMode('login')">Login</button>
         <button class="tab" :class="{ active: mode === 'register' }" type="button"
-          @click="setMode('register')">REGISTER</button>
+          @click="setMode('register')">Register</button>
       </div>
       <div class="alert" :class="{ visible: alert.message, success: alert.success }" role="alert">{{ alert.message }}
       </div>

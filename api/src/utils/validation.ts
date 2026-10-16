@@ -112,3 +112,17 @@ export function safeParse<S extends z.ZodTypeAny>(
   const message = result.error.issues[0]?.message || 'Invalid input';
   return { ok: false, error: message };
 }
+
+export const createPollSchema = z.object({
+  question: z.string().trim().min(1, 'Ask a question').max(200, 'The question is too long'),
+  options: z.array(z.string().trim().min(1, 'Poll options cannot be empty').max(80, 'Poll options are limited to 80 characters'))
+    .min(2, 'Add at least 2 options')
+    .max(10, 'A poll can have at most 10 options'),
+  multi: z.boolean().optional().default(false),
+  to: z.string().trim().min(1).max(20).optional(),
+}).refine((poll) => new Set(poll.options.map((option) => option.toLowerCase())).size === poll.options.length, 'Poll options must be different');
+
+export const votePollSchema = z.object({
+  id: idSchema,
+  option: z.number().int().min(0).max(9),
+});

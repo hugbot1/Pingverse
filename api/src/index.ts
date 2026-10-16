@@ -21,13 +21,13 @@ const mediaDirectory = path.resolve(path.dirname(env.databasePath), 'uploads');
 fs.mkdirSync(mediaDirectory, { recursive: true });
 const allowedMediaTypes = new Set([
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-  'video/mp4', 'video/webm', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/webm',
+  'video/mp4', 'video/webm', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/mp4',
   'application/pdf',
 ]);
 const mediaExtensions: Record<string, string> = {
   'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp',
   'video/mp4': '.mp4', 'video/webm': '.webm', 'audio/mpeg': '.mp3', 'audio/wav': '.wav',
-  'audio/ogg': '.ogg', 'audio/webm': '.webm', 'application/pdf': '.pdf',
+  'audio/ogg': '.ogg', 'audio/webm': '.webm', 'audio/mp4': '.m4a', 'application/pdf': '.pdf',
 };
 const mediaName = (value: unknown) => path.basename(String(value || 'file').replace(/[\\/]/g, '_')).replace(/[<>:"|?*\x00-\x1f]/g, '_').slice(0, 180) || 'file';
 function matchesMediaType(buffer: Buffer, type: string) {
@@ -36,7 +36,7 @@ function matchesMediaType(buffer: Buffer, type: string) {
   if (type === 'image/png') return buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   if (type === 'image/gif') return ['GIF87a', 'GIF89a'].includes(ascii(0, 6));
   if (type === 'image/webp') return ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP';
-  if (type === 'video/mp4') return ascii(4, 8) === 'ftyp';
+  if (type === 'video/mp4' || type === 'audio/mp4') return ascii(4, 8) === 'ftyp';
   if (type === 'video/webm' || type === 'audio/webm') return buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
   if (type === 'audio/mpeg') return ascii(0, 3) === 'ID3' || (buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0);
   if (type === 'audio/wav') return ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WAVE';

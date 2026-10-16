@@ -5,12 +5,12 @@
           }}</button>{{ message.role === 'admin' ? ' (Owner)' : '' }}<small v-if="message.edited"
           class="msg-edited-label">(edited)</small></span>
       <div class="msg-actions">
-        <button v-if="message.user === myUsername" class="msg-action-btn edit" type="button"
+        <button v-if="message.user === myUsername && !message.poll" class="msg-action-btn edit" type="button"
           @click="$emit('edit', message)">[Edit]</button>
         <button v-if="message.user === myUsername" class="msg-action-btn delete" type="button"
           @click="$emit('delete', message.id)">[X]</button>
         <button class="msg-action-btn reply" type="button" @click="$emit('reply', message)">[Reply]</button>
-        <button class="msg-action-btn forward" type="button" @click="$emit('forward', message)">[Forward]</button>
+        <button v-if="!message.poll" class="msg-action-btn forward" type="button" @click="$emit('forward', message)">[Forward]</button>
         <button v-if="(message.to || 'global') !== 'global' || myRole === 'admin'" class="msg-action-btn pin"
           type="button" @click="$emit('pin', message.id)">{{ message.pinned ? '[Unpin]' : '[Pin]' }}</button>
         <button class="msg-action-btn save" type="button" @click="$emit('save', message.id)">{{ message.saved ?
@@ -21,10 +21,25 @@
     <div v-if="message.replyTo" class="reply-box" @click="$emit('jump', message.replyTo.id)"><strong>@{{
       message.replyTo.user }}</strong>: {{ message.replyTo.text }}...</div>
     <div v-if="message.forwardedFrom" class="forwarded-label">Forwarded from @{{ message.forwardedFrom.user }}</div>
-    <span v-if="message.msg" class="msg-content"><template v-for="(part, index) in messageParts" :key="index"><mark
+    <span v-if="message.msg && !message.poll" class="msg-content"><template v-for="(part, index) in messageParts" :key="index"><mark
           v-if="part.user" class="mention-highlight"
           :class="{ 'mention-self': part.user.toLowerCase() === myUsername.toLowerCase() }">{{ part.text
           }}</mark><template v-else>{{ part.text }}</template></template></span>
+    <div v-if="message.poll" class="poll">
+      <div class="poll-question">Poll: {{ message.poll.question }}</div>
+      <div class="poll-meta">{{ message.poll.closed ? 'Poll closed' : message.poll.multi ? 'Select one or more' : 'Select one' }}</div>
+      <button v-for="(option, index) in message.poll.options" :key="index" class="poll-option"
+        :class="{ voted: option.votes.includes(myUsername) }" type="button" :disabled="message.poll.closed"
+        :title="option.votes.length ? option.votes.join(', ') : 'No votes yet'"
+        :aria-pressed="String(option.votes.includes(myUsername))" @click="$emit('vote', message.id, index)">
+        <span class="poll-option-row"><span class="poll-option-text">{{ option.text }}</span><span class="poll-count">{{
+          option.votes.length }} Votes, {{ pollPercent(option) }}%</span></span>
+        <progress class="poll-progress" max="100" :value="pollPercent(option)"></progress>
+      </button>
+      <div class="poll-footer"><span>{{ pollVoters }} {{ pollVoters === 1 ? 'voter' : 'voters' }}</span><button
+          v-if="!message.poll.closed && (message.user === myUsername || myRole === 'admin')" class="poll-close"
+          type="button" @click="$emit('close-poll', message.id)">Close poll</button></div>
+    </div>
     <div v-for="attachment in message.attachments || []" :key="attachment.id" class="message-media">
       <template v-if="attachment.type?.startsWith('image/')"><img class="message-media-image"
           :src="mediaUrl(attachment)" :alt="attachment.name" loading="lazy" crossorigin="use-credentials"><a
@@ -34,7 +49,7 @@
           :src="mediaUrl(attachment)" controls preload="metadata" crossorigin="use-credentials"></video><span
           class="message-media-name">{{ attachment.name }}</span></template>
       <template v-else-if="attachment.type?.startsWith('audio/')"><audio class="message-media-audio"
-          :src="mediaUrl(attachment)" controls preload="metadata" crossorigin="use-credentials"></audio><span
+          :src="mediaUrl(attachment)" controls preload="metadata" crossorigin="use-credentials" @loadedmetadata="fixAudioDuration"></audio><span
           class="message-media-name">{{ attachment.name }}</span></template>
       <a v-else class="message-media-file" :href="mediaUrl(attachment)" target="_blank" rel="noopener noreferrer">{{
         attachment.type === 'application/pdf' ? 'PDF' : 'File' }} · {{ attachment.name }}</a>
@@ -61,7 +76,7 @@
 import { computed, ref } from 'vue';
 
 const props = defineProps({ message: { type: Object, required: true }, myUsername: { type: String, default: '' }, myRole: { type: String, default: 'user' }, knownUsers: { type: Array, default: () => [] }, apiUrl: { type: String, required: true }, pickerOpen: Boolean, pickerAnchor: Object });
-defineEmits(['edit', 'delete', 'reply', 'forward', 'pin', 'save', 'react', 'jump', 'toggle-picker', 'profile']);
+defineEmits(['edit', 'delete', 'reply', 'forward', 'pin', 'save', 'react', 'jump', 'toggle-picker', 'profile', 'vote', 'close-poll']);
 const pickerButton = ref(null);
 const known = computed(() => new Set([...props.knownUsers.map((user) => user.name.toLowerCase()), props.myUsername.toLowerCase()]));
 const visibleReactions = computed(() => Object.fromEntries(Object.entries(props.message.reactions || {}).filter(([, users]) => Array.isArray(users) && users.length)));
@@ -81,5 +96,14 @@ const messageParts = computed(() => {
   parts.push({ text: text.slice(cursor) });
   return parts;
 });
+const pollVoters = computed(() => new Set((props.message.poll?.options || []).flatMap((option) => option.votes)).size);
+const pollPercent = (option) => pollVoters.value ? Math.round((option.votes.length / pollVoters.value) * 100) : 0;
 function mediaUrl(attachment) { return `${props.apiUrl}/media/${encodeURIComponent(attachment.id)}`; }
+function fixAudioDuration(event) {
+  const audio = event.target;
+  if (audio.duration !== Infinity) return;
+  const reset = () => { audio.removeEventListener('timeupdate', reset); audio.currentTime = 0; };
+  audio.addEventListener('timeupdate', reset);
+  audio.currentTime = 1e101;
+}
 </script>
