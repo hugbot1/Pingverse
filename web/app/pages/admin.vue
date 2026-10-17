@@ -142,6 +142,7 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 
 const api = usePingverseApi();
+const { showAlert, showConfirm, showPrompt } = useDialogs();
 const adminName = ref('');
 const pending = ref([]);
 const approved = ref([]);
@@ -183,42 +184,42 @@ async function run(action, refresh = true) {
     if (refresh) await refreshAll();
     return true;
   } catch (error) {
-    window.alert(error.message);
+    await showAlert(error.message);
     return false;
   }
 }
 
-function reject(username) {
-  if (confirm(`Reject and remove the request from "${username}"?`)) run(() => api.post('/admin/users/reject', { username }));
+async function reject(username) {
+  if (await showConfirm(`Reject and remove the request from "${username}"?`, { confirmText: 'Reject', danger: true })) run(() => api.post('/admin/users/reject', { username }));
 }
 
-function timeout(username) {
-  const answer = prompt(`Time out ${username} for how many minutes?`, '10');
+async function timeout(username) {
+  const answer = await showPrompt(`Time out ${username} for how many minutes?`, '10', { confirmText: 'Time out' });
   if (answer === null) return;
   const mins = Number.parseInt(answer, 10);
-  if (Number.isNaN(mins) || mins < 1 || mins > 10080) return window.alert('Enter a whole number of minutes between 1 and 10080.');
+  if (Number.isNaN(mins) || mins < 1 || mins > 10080) return showAlert('Enter a whole number of minutes between 1 and 10080.');
   run(() => api.post('/admin/users/timeout', { username, mins }));
 }
 
-function resetProfile(username) {
-  if (confirm(`Clear "${username}"'s avatar and bio?`)) run(() => api.post('/admin/users/reset-profile', { username }));
+async function resetProfile(username) {
+  if (await showConfirm(`Clear "${username}"'s avatar and bio?`, { confirmText: 'Clear profile', danger: true })) run(() => api.post('/admin/users/reset-profile', { username }));
 }
 
-function deleteUser(username) {
-  if (confirm(`Permanently delete "${username}" and all of their messages? This cannot be undone.`)) run(() => api.post('/admin/users/delete', { username }));
+async function deleteUser(username) {
+  if (await showConfirm(`Permanently delete "${username}" and all of their messages? This cannot be undone.`, { confirmText: 'Delete user', danger: true })) run(() => api.post('/admin/users/delete', { username }));
 }
 
-function deleteMessage(message) {
-  if (confirm(`Delete this message from "${message.user}"?`)) run(() => api.post('/admin/messages/delete', { id: message.id }));
+async function deleteMessage(message) {
+  if (await showConfirm(`Delete this message from "${message.user}"?`, { confirmText: 'Delete', danger: true })) run(() => api.post('/admin/messages/delete', { id: message.id }));
 }
 
-function clearChat() {
-  if (confirm('Erase the ENTIRE global chat history for everyone? This cannot be undone.')) run(() => api.post('/admin/chat/clear', {}));
+async function clearChat() {
+  if (await showConfirm('Erase the ENTIRE global chat history for everyone? This cannot be undone.', { confirmText: 'Erase everything', danger: true })) run(() => api.post('/admin/chat/clear', {}));
 }
 
 async function publishAnnouncement() {
   const text = announcement.value.trim();
-  if (!text) return window.alert('Type a message first, or use "Remove Banner" to clear it.');
+  if (!text) return showAlert('Type a message first, or use "Remove Banner" to clear it.');
   if (!await run(() => api.post('/admin/announcement', { msg: text, important: important.value }), false)) return;
   announcement.value = '';
   important.value = false;

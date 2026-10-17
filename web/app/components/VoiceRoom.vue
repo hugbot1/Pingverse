@@ -4,11 +4,11 @@
     <div class="voice-room-participants">
       <div v-if="activeConversation" class="voice-participant-card" :class="{ speaking: localSpeaking && !muted && !forcedMuted }">
         <span class="voice-participant-name">{{ username }} (you)</span><span class="voice-participant-activity">{{ forcedMuted ? 'Muted by admin' : muted ? 'Muted' : 'Microphone on' }}</span>
-        <div class="voice-participant-menu"><button type="button" @click="toggleMenu('local')">Controls</button><div v-if="openMenuId === 'local'" class="voice-participant-controls"><button class="btn-ghost-accent voice-local-mute" :disabled="!localStream || forcedMuted" @click="toggleSelfMute">{{ forcedMuted ? 'Muted by admin' : muted ? 'Unmute microphone' : 'Mute microphone' }}</button></div></div>
+        <div class="voice-participant-menu"><button type="button" @click="toggleMenu('local')">Controls</button><div v-if="openMenuId === 'local'" class="voice-participant-controls"><button class="btn-ghost-accent voice-local-mute" :disabled="!localStream || forcedMuted" @click="toggleSelfMute">{{ forcedMuted ? 'Muted by admin' : muted ? 'Unmute' : 'Mute' }}</button></div></div>
       </div>
       <div v-for="[id, info] in peerInfo" :key="id" class="voice-participant-card" :class="{ speaking: info.speaking && !info.adminMuted }">
         <div class="voice-participant-identity"><span class="voice-participant-name">{{ info.username }}</span><span class="voice-participant-activity">{{ info.adminMuted ? 'Muted by admin' : info.localMuted ? 'Muted for you' : 'Connected' }}</span></div>
-        <div class="voice-participant-menu"><button type="button" @click="toggleMenu(id)">Controls</button><div v-if="openMenuId === id" class="voice-participant-controls"><button class="btn-ghost-accent voice-local-mute" :aria-pressed="String(info.localMuted)" @click="togglePeerMute(info)">{{ info.localMuted ? 'Unmute for me' : 'Mute for me' }}</button><label class="voice-volume-label">Volume<input v-model.number="info.volumePercent" class="voice-volume" type="range" min="0" max="100" :aria-label="`${info.username} volume`" @input="applyAudioPolicy(info)"></label><button v-if="role === 'admin' && info.username !== username" class="btn-ghost-accent voice-admin-mute" @click="moderateMute(info)">{{ info.adminMuted ? 'Unmute for everyone' : 'Mute for everyone' }}</button></div></div>
+        <div class="voice-participant-menu"><button type="button" @click="toggleMenu(id)">Controls</button><div v-if="openMenuId === id" class="voice-participant-controls"><button class="btn-ghost-accent voice-local-mute" :aria-pressed="String(info.localMuted)" @click="togglePeerMute(info)">{{ info.localMuted ? 'Unmute' : 'Mute' }}</button><label class="voice-volume-label">Volume<input v-model.number="info.volumePercent" class="voice-volume" type="range" min="0" max="100" :aria-label="`${info.username} volume`" @input="applyAudioPolicy(info)"></label><button v-if="role === 'admin' && info.username !== username" class="btn-ghost-accent voice-admin-mute" @click="moderateMute(info)">{{ info.adminMuted ? 'Unmute for everyone' : 'Mute for everyone' }}</button></div></div>
       </div>
     </div>
     <div v-if="localKinds.length || remoteTiles.size" class="voice-video-grid">
@@ -25,12 +25,12 @@
   <div class="voice-presence" :class="{ hidden: !visibleRooms.length }" aria-label="People currently in visible voice rooms"><div class="voice-presence-users">
     <div v-for="room in visibleRooms" :key="room.to" class="voice-presence-group"><span class="voice-presence-label">{{ room.to === 'global' ? 'Global Voice' : `${room.to} Voice` }}</span><span v-for="person in room.participants" :key="person.username" class="voice-presence-user" :class="{ 'admin-muted': person.adminMuted }" :title="`${person.username}${person.adminMuted ? ' · Muted by admin' : ''}`"><span class="voice-presence-name">{{ person.username }}</span><span v-if="person.adminMuted" class="voice-presence-muted">Muted</span></span></div>
   </div></div>
-  <p v-if="errorText" class="voice-error" role="status">{{ errorText }}</p>
 </template>
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 
+const { showAlert } = useDialogs();
 const CHUNK_MS = 250;
 const MAX_PLAYBACK_LEAD_SECONDS = 1.5;
 const SPEAKING_RMS_THRESHOLD = 0.02;
@@ -54,7 +54,6 @@ const localSpeaking = ref(false);
 const muted = ref(false);
 const forcedMuted = ref(false);
 const joining = ref(false);
-const errorText = ref('');
 const openMenuId = ref(null);
 const remoteTiles = reactive(new Map());
 const localKinds = ref([]);
@@ -68,7 +67,7 @@ let audioContext = null;
 let meterTimer = null;
 let typingSamples;
 let recordGeneration = 0;
-const panelVisible = computed(() => Boolean(activeConversation.value || joining.value || errorText.value));
+const panelVisible = computed(() => Boolean(activeConversation.value || joining.value));
 const panelTitle = computed(() => activeConversation.value === 'global' ? 'Global Chat voice' : activeConversation.value ? `${activeConversation.value} voice` : 'Voice room');
 const statusText = ref('');
 const visibleRooms = computed(() => {
@@ -78,6 +77,11 @@ const visibleRooms = computed(() => {
 });
 
 function toggleMenu(id) { openMenuId.value = openMenuId.value === id ? null : id; }
+function closeMenuOutside(event) {
+  if (!openMenuId.value) return;
+  if (event.type === 'keydown') { if (event.key === 'Escape') openMenuId.value = null; return; }
+  if (!event.target.closest?.('.voice-participant-menu')) openMenuId.value = null;
+}
 function refreshPresence() {
   props.socket?.emit('get voice participants', { to: 'global' });
   if (props.conversation !== 'global') props.socket?.emit('get voice participants', { to: props.conversation });
@@ -109,7 +113,7 @@ function startMetering() {
 
 function updateStatus() {
   const count = peerInfo.size;
-  statusText.value = count ? `Connected · ${count + 1} participant${count === 0 ? '' : 's'}` : 'Waiting for others to connect…';
+  statusText.value = count ? `Connected, ${count + 1} participant${count === 0 ? '' : 's'}` : 'Waiting for others to join…';
 }
 
 function applyAudioPolicy(info) {
@@ -210,9 +214,8 @@ async function startVideo(kind) {
   const socket = activeSocket.value;
   const room = activeConversation.value;
   const devices = navigator.mediaDevices;
-  if (!(kind === 'camera' ? devices?.getUserMedia : devices?.getDisplayMedia)) { errorText.value = kind === 'camera' ? 'This browser cannot access a camera.' : 'This browser cannot share your screen.'; return; }
+  if (!(kind === 'camera' ? devices?.getUserMedia : devices?.getDisplayMedia)) { showAlert(kind === 'camera' ? 'This browser cannot access a camera.' : 'This browser cannot share your screen.'); return; }
   pendingVideo.add(kind);
-  errorText.value = '';
   try {
     const stream = kind === 'camera'
       ? await devices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }, audio: false })
@@ -224,8 +227,8 @@ async function startVideo(kind) {
     localKinds.value = [...localKinds.value, kind];
     source.timer = setInterval(() => captureFrame(kind, source), VIDEO_PROFILES[kind].interval);
   } catch (error) {
-    if (error?.name === 'NotAllowedError') errorText.value = kind === 'camera' ? 'Allow camera access in your browser to share video.' : 'Screen sharing was cancelled or blocked.';
-    else errorText.value = kind === 'camera' ? 'Could not start your camera. Check that it is connected and available.' : 'Could not start screen sharing.';
+    if (error?.name === 'NotAllowedError') showAlert(kind === 'camera' ? 'Allow camera access in your browser to share video.' : 'Screen sharing was cancelled or blocked.');
+    else showAlert(kind === 'camera' ? 'Could not start your camera. Check that it is connected and available.' : 'Could not start screen sharing.');
   } finally { pendingVideo.delete(kind); }
 }
 
@@ -300,12 +303,12 @@ async function toggleVoice() {
   if (activeConversation.value) return leaveVoice();
   if (joining.value) return;
   const socket = props.socket; const room = props.conversation;
-  if (!socket?.connected) { errorText.value = 'Chat server is disconnected. Reconnect before joining voice.'; return; }
+  if (!socket?.connected) { showAlert('Chat server was disconnected.'); return; }
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder || !(window.AudioContext || window.webkitAudioContext)) {
-    errorText.value = 'Voice rooms need microphone and audio recording support in this browser.';
+    showAlert('Voice rooms need microphone and audio recording support in this browser.');
     return;
   }
-  joining.value = true; errorText.value = ''; statusText.value = 'Waiting for microphone permission…';
+  joining.value = true; statusText.value = 'Waiting for microphone permission…';
   try { audioContext ||= new (window.AudioContext || window.webkitAudioContext)(); audioContext.resume().catch(() => {}); } catch { /* try */ }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -315,20 +318,20 @@ async function toggleVoice() {
     joining.value = false; activeConversation.value = room; activeSocket.value = socket; muted.value = false; forcedMuted.value = false;
     statusText.value = 'Joining voice room…'; startMetering();
     socket.timeout(6000).emit('voice join', { to: room }, (error, result) => {
-      if (error || !result?.ok) { errorText.value = result?.error || 'Could not join this voice room.'; cleanup(true); return; }
+      if (error || !result?.ok) { showAlert(result?.error || 'Could not join this voice room.'); cleanup(true); return; }
       forcedMuted.value = Boolean(result.forcedMuted);
       for (const person of result.participants || []) createPeerInfo(person.id, person.username, person.adminMuted);
       updateStatus();
       recordGeneration += 1;
       runRecordingLoop(recordGeneration, stream);
     });
-  } catch (error) { joining.value = false; errorText.value = error?.name === 'NotAllowedError' ? 'Allow microphone access in your browser to join voice.' : 'Could not start your microphone. Check that it is connected and available.'; }
+  } catch (error) { joining.value = false; showAlert(error?.name === 'NotAllowedError' ? 'Allow microphone access in your browser to join voice.' : 'Could not start your microphone. Check that it is connected and available.'); }
 }
 
 function toggleSelfMute() { if (!localStream.value || forcedMuted.value) return; muted.value = !muted.value; for (const track of localStream.value.getAudioTracks()) track.enabled = !muted.value; }
 function togglePeerMute(info) { info.localMuted = !info.localMuted; applyAudioPolicy(info); }
 function moderateMute(info) {
-  activeSocket.value?.timeout(5000).emit('voice moderation mute', { username: info.username, muted: !info.adminMuted }, (error, result) => { if (error || !result?.ok) errorText.value = result?.error || 'The voice mute could not be changed.'; });
+  activeSocket.value?.timeout(5000).emit('voice moderation mute', { username: info.username, muted: !info.adminMuted }, (error, result) => { if (error || !result?.ok) showAlert(result?.error || 'The voice mute could not be changed.'); });
 }
 
 function cleanup(notifyServer) {
@@ -343,7 +346,7 @@ function cleanup(notifyServer) {
   localStream.value = null; audioContext?.close().catch(() => {}); audioContext = null;
   activeConversation.value = null; activeSocket.value = null; muted.value = false; forcedMuted.value = false; joining.value = false; openMenuId.value = null;
 }
-function leaveVoice() { cleanup(true); statusText.value = ''; errorText.value = ''; }
+function leaveVoice() { cleanup(true); statusText.value = ''; }
 
 function onPresence({ to, participants }) { if (typeof to === 'string' && Array.isArray(participants)) voicePresence.set(to, participants); }
 function onJoined({ id, username: name, adminMuted }) { if (!activeConversation.value || id === props.socket?.id) return; createPeerInfo(id, name, adminMuted); updateStatus(); }
@@ -357,7 +360,7 @@ function onModeration({ username: name, muted: isMuted }) { for (const [, info] 
 function onForcedMute({ muted: isMuted }) {
   forcedMuted.value = isMuted;
   for (const track of localStream.value?.getAudioTracks() || []) track.enabled = !muted.value && !forcedMuted.value;
-  statusText.value = isMuted ? 'An admin muted your microphone.' : 'You have been unmuted.';
+  showAlert(isMuted ? 'An admin muted your microphone.' : 'You have been unmuted.');
 }
 function onLeft({ id }) { removePeer(id); }
 async function onVideo({ from, kind, username: name, frame }) {
@@ -387,7 +390,7 @@ function detachSocket(socket) {
   socket.off('voice audio', onAudio); socket.off('voice video', onVideo); socket.off('voice video stop', onVideoStop); socket.off('voice moderation update', onModeration); socket.off('voice forced mute', onForcedMute); socket.off('disconnect', onDisconnect);
 }
 watch(() => props.socket, (socket, previous) => { detachSocket(previous); attachSocket(socket); });
-onMounted(() => { canShareScreen.value = Boolean(navigator.mediaDevices?.getDisplayMedia); refreshPresence(); });
-onBeforeUnmount(() => { cleanup(true); detachSocket(props.socket); });
-defineExpose({ activeConversation, joining, toggleVoice });
+onMounted(() => { canShareScreen.value = Boolean(navigator.mediaDevices?.getDisplayMedia); document.addEventListener('pointerdown', closeMenuOutside); document.addEventListener('keydown', closeMenuOutside); refreshPresence(); });
+onBeforeUnmount(() => { document.removeEventListener('pointerdown', closeMenuOutside); document.removeEventListener('keydown', closeMenuOutside); cleanup(true); detachSocket(props.socket); });
+defineExpose({ activeConversation, joining, toggleVoice }); 
 </script>

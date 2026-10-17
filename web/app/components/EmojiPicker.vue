@@ -17,7 +17,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 
 const props = defineProps({ open: Boolean, anchor: Object });
-defineEmits(['close', 'select']);
+const emit = defineEmits(['close', 'select']);
 const picker = ref(null);
 const query = ref('');
 const catalog = ref([]);
@@ -56,15 +56,22 @@ async function loadCatalog() {
   activeGroup.value = groups.value[0] || '';
 }
 
+function onOutsidePointer(event) {
+  if (picker.value?.contains(event.target) || props.anchor?.contains(event.target)) return;
+  emit('close');
+}
+
 function selectGroup(group) { activeGroup.value = group; query.value = ''; }
 watch(() => props.open, async (open) => {
   if (!open) {
+    document.removeEventListener('pointerdown', onOutsidePointer);
     window.removeEventListener('resize', placePicker);
     window.removeEventListener('scroll', placePicker, true);
     window.visualViewport?.removeEventListener('resize', placePicker);
     window.visualViewport?.removeEventListener('scroll', placePicker);
     return;
   }
+  document.addEventListener('pointerdown', onOutsidePointer);
   window.addEventListener('resize', placePicker);
   window.addEventListener('scroll', placePicker, true);
   window.visualViewport?.addEventListener('resize', placePicker);
@@ -74,6 +81,7 @@ watch(() => props.open, async (open) => {
 });
 watch(() => props.anchor, async () => { await nextTick(); placePicker(); });
 onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onOutsidePointer);
   window.removeEventListener('resize', placePicker);
   window.removeEventListener('scroll', placePicker, true);
   window.visualViewport?.removeEventListener('resize', placePicker);

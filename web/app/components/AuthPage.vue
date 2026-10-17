@@ -14,7 +14,7 @@
         <input v-model="password" type="password" placeholder="Password"
           :autocomplete="mode === 'login' ? 'current-password' : 'new-password'" maxlength="128" required>
         <p class="field-hint" :class="{ hidden: mode !== 'register' }">Username: 3-20 letters, numbers, _ or -.
-          Password: at least 8 characters. Accounts must be approved by an admin before you can sign in.</p>
+          Password: at least 8 characters.</p>
         <button class="btn" type="submit" :disabled="busy">{{ busy ? 'Please wait…' : mode === 'login' ? 'Sign In' :
           'Request Account' }}</button>
       </form>

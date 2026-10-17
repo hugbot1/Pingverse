@@ -1,15 +1,15 @@
 <template>
-  <div id="settings-modal" :class="{ visible: settingsOpen }" @click.self="closeSettings">
+  <div id="settings-modal" :class="{ visible: settingsOpen }" @pointerdown="backdropPress" @click="backdropClick($event, closeSettings)">
     <div class="modal-content"><h3 class="settings-title">Account Settings</h3><div class="alert" :class="{ visible: settingsError }" role="alert">{{ settingsError }}</div>
       <form @submit.prevent="saveSettings"><input v-model="newUsername" type="text" placeholder="New Username" autocomplete="off"><input v-model="newPassword" type="password" placeholder="New Password" autocomplete="new-password"><button class="btn" type="submit">Update Account</button></form>
       <div class="settings-profile-section"><div class="settings-avatar-row"><img v-if="myHasAvatar" class="user-avatar settings-avatar" crossorigin="use-credentials" :src="`${api.apiUrl}/profile/avatar/${myUsername}?v=${myAvatarVersion}`" alt="Your avatar"><span v-else class="user-avatar settings-avatar user-avatar-fallback">{{ myUsername.charAt(0).toUpperCase() }}</span><input ref="avatarInput" class="attachment-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp" @change="selectAvatar"><button class="btn-ghost-accent" type="button" :disabled="avatarUploading" @click="avatarInput?.click()">{{ avatarUploading ? 'Uploading…' : 'Change Avatar' }}</button></div>
         <form @submit.prevent="saveProfile"><textarea v-model="bioDraft" class="bio-textarea" placeholder="Bio" maxlength="200"></textarea><button class="btn" type="submit">Save Bio</button></form>
       </div>
-      <button class="btn btn-danger" type="button" @click="deleteOwnAccount">Delete Account &amp; Data</button><button class="btn btn-outline" type="button" @click="closeSettings">Cancel</button>
+      <button class="btn btn-danger" type="button" @click="deleteOwnAccount">⚠ Delete Account &amp; Data ⚠</button><button class="btn btn-outline" type="button" @click="closeSettings">Cancel</button>
     </div>
   </div>
 
-  <dialog ref="profileDialog" class="forward-dialog profile-dialog"><div class="collection-content"><div v-if="profileUser" class="profile-card"><div class="profile-card-header"><img v-if="profileUser.hasAvatar" class="user-avatar profile-avatar" crossorigin="use-credentials" :src="`${api.apiUrl}/profile/avatar/${profileUser.username}?v=${profileUser.avatarVersion}`" :alt="`${profileUser.username}'s avatar`"><span v-else class="user-avatar profile-avatar user-avatar-fallback">{{ profileUser.username.charAt(0).toUpperCase() }}</span><div><strong>{{ profileUser.username }}</strong><span v-if="profileUser.role === 'admin'" class="user-owner-label">(Owner)</span><div class="user-presence-label">{{ profileStatusLabel }}</div></div></div><p class="profile-bio">{{ profileUser.bio || 'No bio set.' }}</p><p class="profile-meta">Member since {{ new Date(profileUser.createdAt).toLocaleDateString() }}</p></div><p v-else class="empty-state">{{ profileError || 'Loading…' }}</p><div class="forward-dialog-actions"><button v-if="canSaveProfile" class="btn btn-outline" type="button" @click="toggleSavedUser(profileUser.username)">{{ profileSaved ? 'Unsave user' : 'Save user' }}</button><button v-if="canBlockProfile" class="btn btn-outline" type="button" @click="toggleBlockProfile">{{ profileBlocked ? 'Unblock' : 'Block' }}</button><button class="btn btn-outline" type="button" @click="closeProfile">Close</button></div></div></dialog>
+  <dialog ref="profileDialog" class="forward-dialog profile-dialog" @pointerdown="backdropPress" @click="backdropClick($event, closeProfile)"><div class="collection-content"><div v-if="profileUser" class="profile-card"><div class="profile-card-header"><img v-if="profileUser.hasAvatar" class="user-avatar profile-avatar" crossorigin="use-credentials" :src="`${api.apiUrl}/profile/avatar/${profileUser.username}?v=${profileUser.avatarVersion}`" :alt="`${profileUser.username}'s avatar`"><span v-else class="user-avatar profile-avatar user-avatar-fallback">{{ profileUser.username.charAt(0).toUpperCase() }}</span><div><strong>{{ profileUser.username }}</strong><span v-if="profileUser.role === 'admin'" class="user-owner-label">(Owner)</span><div class="user-presence-label">{{ profileStatusLabel }}</div></div></div><p class="profile-bio">{{ profileUser.bio || 'No bio set.' }}</p><p class="profile-meta">Member since {{ new Date(profileUser.createdAt).toLocaleDateString() }}</p></div><p v-else class="empty-state">{{ profileError || 'Loading…' }}</p><div class="forward-dialog-actions"><button v-if="canSaveProfile" class="btn btn-outline" type="button" @click="toggleSavedUser(profileUser.username)">{{ profileSaved ? 'Unsave user' : 'Save user' }}</button><button v-if="canBlockProfile" class="btn btn-outline" type="button" @click="toggleBlockProfile">{{ profileBlocked ? 'Unblock' : 'Block' }}</button><button class="btn btn-outline" type="button" @click="closeProfile">Close</button></div></div></dialog>
 
   <div id="chat-screen">
     <div class="sidebar">
@@ -18,14 +18,14 @@
       <div class="sidebar-footer">
         <button v-if="myRole === 'admin'" class="btn-ghost-accent" type="button" @click="go('/admin')">Admin</button>
         <label class="presence-control"><span>Status</span><select v-model="presenceStatus" aria-label="Your presence status" @change="socket?.emit('set presence', presenceStatus)"><option value="online">Online</option><option value="idle">Idle</option><option value="dnd">Do Not Disturb</option></select></label>
-        <div class="profile-section" tabindex="0" role="button" title="Manage Account" @click="openSettings" @keydown.enter="openSettings" @keydown.space.prevent="openSettings"><div class="profile-info"><span class="settings-trigger-label"></span><span id="user-badge">{{ myUsername }}{{ myRole === 'admin' ? ' (Owner)' : '' }}</span></div><span class="gear-icon">P</span></div>
+        <div class="profile-section" tabindex="0" role="button" title="Manage Account" @click="openSettings" @keydown.enter="openSettings" @keydown.space.prevent="openSettings"><div class="profile-info"><span class="settings-trigger-label"></span><span id="user-badge">{{ myUsername }}{{ myRole === 'admin' ? ' (Owner)' : '' }}</span></div><span class="gear-icon">☺</span></div>
         <div class="logout-row"><button class="logout-link" type="button" @click="signOut">Logout</button></div>
       </div>
     </div>
 
     <div class="main-chat">
       <div class="chat-header"><div class="chat-header-left"><button class="btn-ghost-accent" :class="{ hidden: !activePrivateUser }" type="button" @click="exitPrivate">Return</button><span>{{ activePrivateUser || 'Pingverse Chat' }}</span></div><div class="logo-container"><img src="/assets/logos/logo.png" alt="Pingverse logo" class="logo-img"></div>
-        <div class="chat-header-tools"><button class="btn-ghost-accent" :aria-pressed="String(Boolean(voiceRef?.activeConversation))" @click="voiceRef?.toggleVoice()">{{ voiceRef?.joining ? 'Joining…' : voiceRef?.activeConversation ? 'Leave voice' : 'Join voice' }}</button><button id="notifications-btn" class="btn-ghost-accent" :aria-pressed="String(alertsEnabled)" :disabled="alertsUnavailable" :title="alertsTitle" @click="toggleBrowserAlerts">{{ alertsLabel }}</button><button class="btn-ghost-accent" @click="openCollection('pins')">Pins</button><button class="btn-ghost-accent" @click="openCollection('saved')">Saved</button><button class="btn-ghost-accent" type="button" @click="openPoll">Poll</button><button class="btn-ghost-accent" @click="toggleSearch">Search</button></div>
+        <div class="chat-header-tools"><button class="btn-ghost-accent" :aria-pressed="String(Boolean(voiceRef?.activeConversation))" @click="voiceRef?.toggleVoice()">{{ voiceRef?.joining ? 'Joining…' : voiceRef?.activeConversation ? 'Leave voice' : 'Join voice' }}</button><div class="header-menu"><button class="btn-ghost-accent" type="button" aria-haspopup="true" :aria-expanded="String(toolsMenuOpen)" @click="toolsMenuOpen = !toolsMenuOpen">☰</button><div v-if="toolsMenuOpen" class="voice-participant-controls"><button id="notifications-btn" class="btn-ghost-accent" type="button" :aria-pressed="String(alertsEnabled)" :disabled="alertsUnavailable" :title="alertsTitle" @click="toggleBrowserAlerts">{{ alertsLabel }}</button><button class="btn-ghost-accent" type="button" @click="toolsMenuOpen = false; openCollection('pins')">🖈 Pins</button><button class="btn-ghost-accent" type="button" @click="toolsMenuOpen = false; openCollection('saved')">♡ Saved</button><button class="btn-ghost-accent" type="button" @click="toolsMenuOpen = false; openPoll()">ⓘ Poll</button><button class="btn-ghost-accent" type="button" @click="toolsMenuOpen = false; toggleSearch()">🔍︎ Search</button></div></div></div>
       </div>
       <div id="broadcast-bar" :class="{ visible: announcement.msg, 'important-flash': announcement.important }"><span>{{ announcement.msg }}</span></div>
       <VoiceRoom ref="voiceRef" :socket="socket" :conversation="activePrivateUser || 'global'" :username="myUsername" :role="myRole" />
@@ -39,14 +39,14 @@
       <div class="reply-preview-area" :class="{ visible: replyContext }"><span class="reply-preview-text">{{ replyContext ? `Replying to @${replyContext.user}: "${replyContext.text}..."` : '' }}</span><button class="reply-preview-cancel" type="button" @click="replyContext = null">&#10005;</button></div>
       <div class="attachment-tray" :class="{ hidden: !attachments.length }" aria-live="polite"><span v-for="(file, index) in attachments" :key="`${file.name}-${file.lastModified}`" class="attachment-chip">{{ file.name }} ({{ formatFileSize(file.size) }})<button type="button" :aria-label="`Remove ${file.name}`" @click="attachments.splice(index, 1)">×</button></span></div>
       <div class="chat-upload-error" :class="{ visible: chatError }" role="alert" aria-live="assertive">{{ chatError }}</div>
-      <form class="input-area" @submit.prevent="sendMessage"><div class="mention-suggestions" :class="{ hidden: !mentionMatches.length }" role="listbox" aria-label="Mention suggestions"><button v-for="(name, index) in mentionMatches" :key="name" class="mention-suggestion" :aria-selected="index === mentionIndex" type="button" @pointerdown.prevent @click="insertMention(name)"><span>@{{ name }}</span><small>{{ index === 0 ? 'Mention user' : '' }}</small></button></div><input ref="attachmentInput" class="attachment-input" type="file" multiple aria-label="Choose files to attach" @change="selectAttachments"><button class="attachment-btn" type="button" aria-label="Attach files" title="Attach files" @click="attachmentInput?.click()">+</button><button class="attachment-btn voice-record-btn" :class="{ recording: voiceRecording }" type="button" :aria-label="voiceRecording ? 'Stop and send voice message' : 'Record voice message'" :title="voiceRecording ? 'Stop and send' : 'Record a voice message'" :disabled="sending && !voiceRecording" @click="voiceRecording ? stopVoiceMessage() : startVoiceMessage()">{{ voiceRecording ? `■ ${formatDuration(voiceSeconds)}` : 'V' }}</button><button v-if="voiceRecording" class="attachment-btn voice-record-btn" type="button" aria-label="Cancel recording" title="Cancel recording" @click="stopVoiceMessage(true)">✕</button><input ref="messageInput" v-model="draft" placeholder="Type a message..." autocomplete="off" maxlength="500" aria-autocomplete="list" :aria-expanded="String(Boolean(mentionMatches.length))" @input="onDraftInput" @keydown="onDraftKeydown" @blur="stopTyping(); mentionMatches = []"><button class="btn" type="submit" :disabled="sending">Send</button></form>
+      <form class="input-area" @submit.prevent="sendMessage"><div class="mention-suggestions" :class="{ hidden: !mentionMatches.length }" role="listbox" aria-label="Mention suggestions"><button v-for="(name, index) in mentionMatches" :key="name" class="mention-suggestion" :aria-selected="index === mentionIndex" type="button" @pointerdown.prevent @click="insertMention(name)"><span>@{{ name }}</span><small>{{ index === 0 ? 'Mention user' : '' }}</small></button></div><input ref="attachmentInput" class="attachment-input" type="file" multiple aria-label="Choose files to attach" @change="selectAttachments"><button class="attachment-btn" type="button" aria-label="Attach files" title="Attach files" @click="attachmentInput?.click()">+</button><button class="attachment-btn voice-record-btn" :class="{ recording: voiceRecording }" type="button" :aria-label="voiceRecording ? 'Stop and send voice message' : 'Record voice message'" :title="voiceRecording ? 'Stop and send' : 'Record a voice message'" :disabled="sending && !voiceRecording" @click="voiceRecording ? stopVoiceMessage() : startVoiceMessage()">{{ voiceRecording ? `■ ${formatDuration(voiceSeconds)}` : '🕪' }}</button><button v-if="voiceRecording" class="attachment-btn voice-record-btn" type="button" aria-label="Cancel recording" title="Cancel recording" @click="stopVoiceMessage(true)">✕</button><input ref="messageInput" v-model="draft" placeholder="Type a message..." autocomplete="off" maxlength="500" aria-autocomplete="list" :aria-expanded="String(Boolean(mentionMatches.length))" @input="onDraftInput" @keydown="onDraftKeydown" @blur="stopTyping(); mentionMatches = []"><button class="btn" type="submit" :disabled="sending">Send</button></form>
       <button id="scroll-bottom-btn" :class="{ visible: showScrollButton }" type="button" @click="scrollToBottom">&#8595; New Messages</button>
     </div>
   </div>
 
-  <dialog ref="forwardDialog" class="forward-dialog"><form @submit.prevent="sendForward"><h2>Forward message</h2><div class="forward-preview">{{ forwardingMessage ? `${forwardingMessage.user}: ${forwardingMessage.msg}` : '' }}</div><label for="forward-recipient">Send to</label><select id="forward-recipient" v-model="forwardRecipient" required><option value="global">Global Chat</option><option v-for="user in approvedUsers.filter((entry) => entry.name !== myUsername)" :key="user.name" :value="user.name">{{ user.name }}</option></select><div class="forward-error" role="alert">{{ forwardError }}</div><div class="forward-dialog-actions"><button class="btn btn-outline" type="button" @click="closeForward">Cancel</button><button class="btn" type="submit">Forward</button></div></form></dialog>
-  <dialog ref="pollDialog" class="forward-dialog poll-dialog"><form @submit.prevent="submitPoll"><h2>Create poll</h2><input v-model="pollQuestion" type="text" placeholder="Ask a question" maxlength="200" required><div class="poll-option-inputs"><div v-for="(option, index) in pollOptions" :key="index" class="poll-option-input"><input v-model="pollOptions[index]" type="text" :placeholder="`Option ${index + 1}`" maxlength="80"><button v-if="pollOptions.length > 2" class="btn btn-outline" type="button" :aria-label="`Remove option ${index + 1}`" @click="pollOptions.splice(index, 1)">✕</button></div></div><button v-if="pollOptions.length < 10" class="btn btn-outline" type="button" @click="pollOptions.push('')">Add option</button><label class="poll-multi"><input v-model="pollMulti" type="checkbox"> Allow multiple answers</label><div class="forward-error" role="alert">{{ pollError }}</div><div class="forward-dialog-actions"><button class="btn btn-outline" type="button" @click="closePollDialog">Cancel</button><button class="btn" type="submit">Create poll</button></div></form></dialog>
-  <dialog ref="collectionDialog" class="forward-dialog collection-dialog"><div class="collection-content"><div class="collection-header"><h2>{{ collectionKind === 'saved' ? 'Saved messages' : `Pins in ${activePrivateUser || 'Global Chat'}` }}</h2><button class="btn btn-outline" type="button" @click="collectionDialog?.close()">Close</button></div><div class="collection-items">{{ collectionLoading ? 'Loading…' : '' }}<template v-if="!collectionLoading && !collectionMessages.length">{{ collectionKind === 'saved' ? 'No saved messages yet.' : 'No pinned messages in this chat.' }}</template><button v-for="message in collectionMessages" :key="message.id" class="collection-item" type="button" @click="openCollectedMessage(message)"><strong>{{ message.user }} · {{ conversationLabel(message) }}</strong><span>{{ message.msg }}</span></button></div></div></dialog>
+  <dialog ref="forwardDialog" class="forward-dialog" @pointerdown="backdropPress" @click="backdropClick($event, closeForward)"><form @submit.prevent="sendForward"><h2>Forward message</h2><div class="forward-preview">{{ forwardingMessage ? `${forwardingMessage.user}: ${forwardingMessage.msg}` : '' }}</div><label for="forward-recipient">Send to</label><select id="forward-recipient" v-model="forwardRecipient" required><option value="global">Global Chat</option><option v-for="user in approvedUsers.filter((entry) => entry.name !== myUsername)" :key="user.name" :value="user.name">{{ user.name }}</option></select><div class="forward-error" role="alert">{{ forwardError }}</div><div class="forward-dialog-actions"><button class="btn btn-outline" type="button" @click="closeForward">Cancel</button><button class="btn" type="submit">Forward</button></div></form></dialog>
+  <dialog ref="pollDialog" class="forward-dialog poll-dialog" @pointerdown="backdropPress" @click="backdropClick($event, closePollDialog)"><form @submit.prevent="submitPoll"><h2>Create poll</h2><div class="poll-field"><label for="poll-question">Question</label><input id="poll-question" v-model="pollQuestion" type="text" placeholder="What do you want to ask?" maxlength="200" autocomplete="off" required></div><div class="poll-field"><label>Options</label><div class="poll-option-inputs"><div v-for="(option, index) in pollOptions" :key="index" class="poll-option-input"><input v-model="pollOptions[index]" type="text" :placeholder="`Option ${index + 1}`" :aria-label="`Option ${index + 1}`" maxlength="80" autocomplete="off"><button v-if="pollOptions.length > 2" class="poll-remove" type="button" :aria-label="`Remove option ${index + 1}`" @click="pollOptions.splice(index, 1)">✕</button></div></div><button v-if="pollOptions.length < 10" class="btn-ghost-accent poll-add" type="button" @click="pollOptions.push('')">+ Add option</button></div><label class="poll-multi"><input v-model="pollMulti" type="checkbox"> Allow multiple answers</label><div class="forward-error" role="alert">{{ pollError }}</div><div class="forward-dialog-actions"><button class="btn btn-outline" type="button" @click="closePollDialog">Cancel</button><button class="btn" type="submit">Create poll</button></div></form></dialog>
+  <dialog ref="collectionDialog" class="forward-dialog collection-dialog" @pointerdown="backdropPress" @click="backdropClick($event, closeCollection)"><div class="collection-content"><div class="collection-header"><h2>{{ collectionKind === 'saved' ? 'Saved messages' : `Pins in ${activePrivateUser || 'Global Chat'}` }}</h2><button class="btn btn-outline" type="button" @click="collectionDialog?.close()">Close</button></div><div class="collection-items">{{ collectionLoading ? 'Loading…' : '' }}<template v-if="!collectionLoading && !collectionMessages.length">{{ collectionKind === 'saved' ? 'No saved messages yet.' : 'No pinned messages in this chat.' }}</template><button v-for="message in collectionMessages" :key="message.id" class="collection-item" type="button" @click="openCollectedMessage(message)"><strong>{{ message.user }} · {{ conversationLabel(message) }}</strong><span>{{ message.msg }}</span></button></div></div></dialog>
 </template>
 
 <script setup>
@@ -56,7 +56,7 @@ import ChatUserList from '~/components/ChatUserList.vue';
 import MessageItem from '~/components/MessageItem.vue';
 import VoiceRoom from '~/components/VoiceRoom.vue';
 
-const api = usePingverseApi();
+const api = usePingverseApi(); const { showAlert, showConfirm, showPrompt } = useDialogs();
 const socket = ref(null);
 const voiceRef = ref(null);
 const myUsername = ref(''); const myRole = ref('user'); const fullHistory = ref([]); const approvedUsers = ref([]); const activePrivateUser = ref(null); const presenceStatus = ref('online');
@@ -69,7 +69,7 @@ const messageScroller = ref(null); const messageInput = ref(null); const attachm
 const announcement = ref({ msg: '', important: false }); const alertsEnabled = ref(false); const alertsUnavailable = ref(false); const alertsTitle = ref('Enable browser notifications for direct messages and mentions'); const alertsLabel = ref('Alerts Off');
 const activeEmojiId = ref(null); const activeEmojiAnchor = ref(null); const forwardingMessage = ref(null); const forwardRecipient = ref('global'); const forwardError = ref(''); const forwardDialog = ref(null); const collectionDialog = ref(null); const collectionKind = ref(null); const collectionMessages = ref([]); const collectionLoading = ref(false);
 let typingTarget = null; let typingStopTimer = null; let searchTimer = null; let activityTimer = 0; let visibilityHandler;
-const pollDialog = ref(null); const pollQuestion = ref(''); const pollOptions = ref(['', '']); const pollMulti = ref(false); const pollError = ref('');
+const toolsMenuOpen = ref(false); const pollDialog = ref(null); const pollQuestion = ref(''); const pollOptions = ref(['', '']); const pollMulti = ref(false); const pollError = ref('');
 const VOICE_MESSAGE_MAX_SECONDS = 120; const voiceRecording = ref(false); const voiceSeconds = ref(0);
 let voiceRecorder = null; let voiceTimer = null; let voiceCancelled = false; let voiceStarting = false; let voiceTarget = 'global';
 const typingText = computed(() => { const names = [...(typingMap.value.get(activePrivateUser.value || 'global') || [])]; if (!names.length) return ''; if (names.length === 1) return `${names[0]} is typing…`; return `${names.slice(0, -1).join(', ')}, and ${names.at(-1)} are typing…`; });
@@ -168,14 +168,31 @@ async function sendVoiceMessage(blob, target) {
     if (sameChat) replyContext.value = null;
   } catch (error) { showError(error.message || 'The voice message could not be sent.'); } finally { sending.value = false; }
 }
+let backdropPressTarget = null;
+function backdropPress(event) { backdropPressTarget = event.target; }
+function backdropClick(event, close) {
+  const host = event.currentTarget;
+  if (event.target !== host || backdropPressTarget !== host) return;
+  if (host.tagName === 'DIALOG') {
+    const rect = host.getBoundingClientRect();
+    if (event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom) return;
+  }
+  close();
+}
+function closePopups(event) {
+  if (event.type === 'keydown') { if (event.key === 'Escape') toolsMenuOpen.value = false; return; }
+  const target = event.target;
+  if (!target.closest?.('.header-menu')) toolsMenuOpen.value = false;
+  if (target !== messageInput.value && !target.closest?.('.mention-suggestions')) mentionMatches.value = [];
+}
 function openPoll() { pollQuestion.value = ''; pollOptions.value = ['', '']; pollMulti.value = false; pollError.value = ''; pollDialog.value?.showModal(); }
 function closePollDialog() { pollDialog.value?.close(); }
 function submitPoll() {
   const options = pollOptions.value.map((option) => option.trim()).filter(Boolean);
   socket.value?.emit('create poll', { question: pollQuestion.value.trim(), options, multi: pollMulti.value, to: activePrivateUser.value || 'global' }, (result) => result?.ok ? closePollDialog() : pollError.value = result?.error || 'Could not create the poll.');
 }
-function votePoll(id, option) { socket.value?.emit('vote poll', { id: String(id), option }, (result) => { if (!result?.ok) alert(result?.error || 'Could not record your vote.'); }); }
-function closePoll(id) { if (confirm('Close this poll? Nobody will be able to vote after this.')) socket.value?.emit('close poll', String(id), (result) => { if (!result?.ok) alert(result?.error || 'Could not close the poll.'); }); }
+function votePoll(id, option) { socket.value?.emit('vote poll', { id: String(id), option }, (result) => { if (!result?.ok) showAlert(result?.error || 'Could not record your vote.'); }); }
+async function closePoll(id) { if (!await showConfirm('Close this poll? Nobody will be able to vote after this.', { confirmText: 'Close poll' })) return; socket.value?.emit('close poll', String(id), (result) => { if (!result?.ok) showAlert(result?.error || 'Could not close the poll.'); }); }
 function requestSearch() { clearTimeout(searchTimer); if (!searchActive.value || !socket.value) return; searchCount.value = 'Searching…'; searchTimer = setTimeout(() => socket.value?.emit('search messages', { to: activePrivateUser.value || 'global', query: searchQuery.value, author: searchAuthor.value, sort: searchSort.value, requestId: ++searchRequestId }), 180); }
 let searchRequestId = 0;
 function toggleSearch() { searchActive.value = !searchActive.value; if (searchActive.value) { nextTick(() => searchInput.value?.focus()); requestSearch(); } else { searchResults.value = []; searchCount.value = ''; } }
@@ -187,14 +204,14 @@ function closeCollection() { collectionDialog.value?.close(); collectionKind.val
 function openCollectedMessage(message) { closeCollection(); if (message.to === 'global') { if (activePrivateUser.value) exitPrivate(); } else { const peer = message.user === myUsername.value ? message.to : message.user; if (activePrivateUser.value !== peer) startPrivate(peer); } searchQuery.value = ''; searchAuthor.value = ''; if (!fullHistory.value.some((entry) => entry.id === message.id)) fullHistory.value.push(message); nextTick(() => scrollToMessage(message.id)); }
 function toggleEmojiPicker(id, anchor) { activeEmojiId.value = activeEmojiId.value === id ? null : id; activeEmojiAnchor.value = activeEmojiId.value ? anchor : null; }
 function toggleReaction(id, emoji) { socket.value?.emit('toggle reaction', { id, emoji }); }
-function togglePin(id) { socket.value?.emit('toggle pin', { id: String(id) }, (result) => { if (!result?.ok) alert(result?.error || 'Could not update the pin.'); }); }
-function toggleSaved(id) { socket.value?.emit('toggle saved message', { id: String(id) }, (result) => { if (!result?.ok) alert(result?.error || 'Could not update saved messages.'); }); }
-function editMessage(message) { const text = prompt('Edit your message:', message.msg); if (text?.trim()) socket.value?.emit('edit message', { id: message.id, newMsg: text.trim() }); }
-function deleteMessage(id) { if (confirm('Delete this message?')) socket.value?.emit('delete message', id); }
+function togglePin(id) { socket.value?.emit('toggle pin', { id: String(id) }, (result) => { if (!result?.ok) showAlert(result?.error || 'Could not update the pin.'); }); }
+function toggleSaved(id) { socket.value?.emit('toggle saved message', { id: String(id) }, (result) => { if (!result?.ok) showAlert(result?.error || 'Could not update saved messages.'); }); }
+async function editMessage(message) { const text = await showPrompt('Edit your message:', message.msg, { confirmText: 'Save' }); if (text?.trim()) socket.value?.emit('edit message', { id: message.id, newMsg: text.trim() }); }
+async function deleteMessage(id) { if (await showConfirm('Delete this message?', { confirmText: 'Delete', danger: true })) socket.value?.emit('delete message', id); }
 function openSettings() { settingsError.value = ''; newUsername.value = ''; newPassword.value = ''; settingsOpen.value = true; }
 function closeSettings() { settingsOpen.value = false; }
 function saveSettings() { const username = newUsername.value.trim(); const password = newPassword.value.trim(); if (!username && !password) return; if (password && password.length < 8) { settingsError.value = 'New password must be at least 8 characters.'; return; } socket.value?.emit('update account', { username: username || null, password: password || null }); }
-function deleteOwnAccount() { if (confirm('Are you absolutely sure you want to completely erase your account and all your data? This action is fatal.')) socket.value?.emit('delete account', null); }
+async function deleteOwnAccount() { if (await showConfirm('Are you absolutely sure you want to completely erase your account and all your data? This action is fatal.', { confirmText: 'Delete everything', danger: true })) socket.value?.emit('delete account', null); }
 function saveProfile() { socket.value?.emit('update profile', { bio: bioDraft.value.trim() }); }
 async function selectAvatar(event) {
   const file = event.target.files?.[0]; event.target.value = '';
@@ -217,13 +234,13 @@ async function openProfile(username) {
 function closeProfile() { profileDialog.value?.close(); profileUser.value = null; }
 function toggleSavedUser(name) {
   const saved = approvedUsers.value.find((user) => user.name === name)?.isSaved;
-  socket.value?.emit(saved ? 'unsave user' : 'save user', name, (result) => { if (!result?.ok) alert(result?.error || 'Could not update saved users.'); });
+  socket.value?.emit(saved ? 'unsave user' : 'save user', name, (result) => { if (!result?.ok) showAlert(result?.error || 'Could not update saved users.'); });
 }
-function toggleBlockProfile() {
+async function toggleBlockProfile() {
   const name = profileUser.value?.username; if (!name) return;
   const block = !profileBlocked.value;
-  if (block && !confirm(`Block ${name}?`)) return;
-  socket.value?.emit(block ? 'block user' : 'unblock user', name, (result) => { if (!result?.ok) alert(result?.error || 'Could not update the block.'); });
+  if (block && !await showConfirm(`Block ${name}?`, { confirmText: 'Block', danger: true })) return;
+  socket.value?.emit(block ? 'block user' : 'unblock user', name, (result) => { if (!result?.ok) showAlert(result?.error || 'Could not update the block.'); });
 }
 async function signOut() { try { await api.post('/auth/logout', {}); } catch { /* if api cant be reached */ } go('/'); }
 function messageMentionsUser(message, username) { const escaped = username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); return new RegExp(`(^|[^A-Za-z0-9_-])@${escaped}(?![A-Za-z0-9_-])`, 'i').test(message || ''); }
@@ -262,18 +279,19 @@ function connect() {
   client.on('chat cleared', () => { fullHistory.value = fullHistory.value.filter((message) => message.to !== 'global'); });
   client.on('user purged', (name) => { fullHistory.value = fullHistory.value.filter((message) => message.user !== name && message.to !== name); for (const [to, names] of typingMap.value) { const next = new Set(names); next.delete(name); typingMap.value.set(to, next); } if (activePrivateUser.value === name) exitPrivate(); });
   client.on('announcement', (value) => { announcement.value = value?.msg ? value : { msg: '', important: false }; });
-  client.on('user status alert', ({ target, muted, until }) => { if (target === myUsername.value && muted) alert(`You have been timed out until ${new Date(until).toLocaleTimeString()}.`); client.emit('get users'); });
-  client.on('error notice', (message) => alert(message));
-  client.on('settings success', (message) => { alert(message); closeSettings(); go('/'); });
+  client.on('user status alert', ({ target, muted, until }) => { if (target === myUsername.value && muted) showAlert(`You have been timed out until ${new Date(until).toLocaleTimeString()}.`); client.emit('get users'); });
+  client.on('error notice', (message) => showAlert(message));
+  client.on('settings success', async (message) => { await showAlert(message); closeSettings(); go('/'); });
   client.on('settings error', (message) => { settingsError.value = message; });
-  client.on('force logout', () => { alert('Your session has ended.'); go('/'); });
+  client.on('force logout', async () => { await showAlert('Your session has ended.'); go('/'); });
   client.on('disconnect', (reason) => console.warn(`Disconnected from chat server (${reason || 'unknown reason'}); Socket.IO will retry automatically.`));
 }
 
 onMounted(async () => {
+  document.addEventListener('pointerdown', closePopups); document.addEventListener('keydown', closePopups);
   try { const me = await api.get('/auth/me'); if (!me?.username) return go('/'); connect(); setAlertsState(); }
   catch { go('/'); }
   visibilityHandler = onVisibilityChange; document.addEventListener('visibilitychange', visibilityHandler); for (const event of ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'scroll']) document.addEventListener(event, onActivity, { passive: true });
 });
-onBeforeUnmount(() => { stopVoiceMessage(true); clearInterval(voiceTimer); stopTyping(); clearTimeout(searchTimer); document.removeEventListener('visibilitychange', visibilityHandler); for (const event of ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'scroll']) document.removeEventListener(event, onActivity); socket.value?.disconnect(); });
+onBeforeUnmount(() => { document.removeEventListener('pointerdown', closePopups); document.removeEventListener('keydown', closePopups); stopVoiceMessage(true); clearInterval(voiceTimer); stopTyping(); clearTimeout(searchTimer); document.removeEventListener('visibilitychange', visibilityHandler); for (const event of ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'scroll']) document.removeEventListener(event, onActivity); socket.value?.disconnect(); });
 </script>

@@ -1,5 +1,6 @@
 <template>
   <NuxtPage />
+  <AppDialog />
 </template>
 
 <script setup>
