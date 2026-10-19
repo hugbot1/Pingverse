@@ -13,6 +13,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiUrl: process.env.NUXT_PUBLIC_API_URL || process.env.API_URL || 'http://localhost:4000',
+      r2Url: process.env.NUXT_PUBLIC_R2_URL || process.env.R2_URL || '/lastresortfallbackerror.html?msg=Could not find the R2 URL',
     },
   },
 });

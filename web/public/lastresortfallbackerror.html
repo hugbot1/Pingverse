@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error</title>
+</head>
+
+<body>
+    <h1>Something went wrong</h1>
+    <h2 id="msg"></h2>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const msg = params.get('msg');
+        const displayMsg = msg ? msg.split('/')[0] : 'Unknown';
+        document.getElementById('msg').textContent = 'Message: ' + displayMsg;
+    </script>
+</body>
+
+</html>
