@@ -39,8 +39,6 @@
     </section>
     <section class="panel">
       <h2 class="panel-title">Users</h2>
-      <p class="panel-note">Admin accounts are protected. Roles are only ever changed in the database
-        (<code>npm run set-role</code>).</p>
       <div class="table-wrap">
         <table v-if="approved.length" class="admin-table">
           <thead>
