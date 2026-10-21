@@ -198,7 +198,7 @@ function requestSearch() { clearTimeout(searchTimer); if (!searchActive.value ||
 let searchRequestId = 0;
 function toggleSearch() { searchActive.value = !searchActive.value; if (searchActive.value) { nextTick(() => searchInput.value?.focus()); requestSearch(); } else { searchResults.value = []; searchCount.value = ''; } }
 function startDownload(app) { if (app === 'desktopwin') window.open(`${r2.r2Url}/PingverseSetup.exe`, '_blank'); }
-function startWikirace() { window.open(`https://wikirace-app.pingverse.site/?createMatch=true&name=${myUsername}`, "Pingverse - Wikirace", "width=600,height=400,left=100,top=100,resizable=yes,scrollbars=yes"); }
+function startWikirace() { window.open(`https://wikirace-app.pingverse.site/?createMatch=true&name=${encodeURIComponent(myUsername.value)}`, 'Pingverse - Wikirace', 'width=600,height=400,left=100,top=100,resizable=yes,scrollbars=yes'); }
 function openForward(message) { forwardingMessage.value = message; forwardRecipient.value = 'global'; forwardError.value = ''; nextTick(() => forwardDialog.value?.showModal()); }
 function closeForward() { forwardDialog.value?.close(); forwardingMessage.value = null; }
 function sendForward() { if (!forwardingMessage.value) return; socket.value?.emit('forward message', { id: forwardingMessage.value.id, to: forwardRecipient.value }, (result) => result?.ok ? closeForward() : forwardError.value = result?.error || 'Could not forward this message.'); }
