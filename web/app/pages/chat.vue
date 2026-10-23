@@ -181,9 +181,18 @@ function backdropClick(event, close) {
   close();
 }
 function closePopups(event) {
-  if (event.type === 'keydown') { if (event.key === 'Escape') toolsMenuOpen.value = false; appsMenuOpen.value = false; return; }
+  if (event.type === 'keydown') {
+    if (event.key === 'Escape') {
+      toolsMenuOpen.value = false;
+      appsMenuOpen.value = false;
+    }
+    return;
+  }
   const target = event.target;
-  if (!target.closest?.('.header-menu')) toolsMenuOpen.value = false; appsMenuOpen.value = false;
+  if (!target.closest?.('.header-menu')) {
+    toolsMenuOpen.value = false;
+    appsMenuOpen.value = false;
+  }
   if (target !== messageInput.value && !target.closest?.('.mention-suggestions')) mentionMatches.value = [];
 }
 function openPoll() { pollQuestion.value = ''; pollOptions.value = ['', '']; pollMulti.value = false; pollError.value = ''; pollDialog.value?.showModal(); }
